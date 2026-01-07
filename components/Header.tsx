@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Search, Menu, User as UserIcon, LogOut, Settings } from 'lucide-react';
 import { User, League } from '../types';
@@ -9,9 +10,10 @@ interface HeaderProps {
   onSearch: (query: string) => void;
   onSelectLeague: (league: League | null) => void;
   onGoHome: () => void;
+  onProfileClick: (user: User) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ user, onLogin, onLogout, onSearch, onSelectLeague, onGoHome }) => {
+const Header: React.FC<HeaderProps> = ({ user, onLogin, onLogout, onSearch, onSelectLeague, onGoHome, onProfileClick }) => {
   const [query, setQuery] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -19,6 +21,13 @@ const Header: React.FC<HeaderProps> = ({ user, onLogin, onLogout, onSearch, onSe
     e.preventDefault();
     if (query.trim()) {
       onSearch(query);
+    }
+  };
+
+  const handleProfileNav = () => {
+    if (user) {
+      onProfileClick(user);
+      setShowUserMenu(false);
     }
   };
 
@@ -104,10 +113,13 @@ const Header: React.FC<HeaderProps> = ({ user, onLogin, onLogout, onSearch, onSe
               {/* User Dropdown */}
               {showUserMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-dark-800 border border-dark-700 rounded shadow-xl py-2 animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                   <div className="px-4 py-2 border-b border-dark-700 mb-2">
+                   <div className="px-4 py-2 border-b border-dark-700 mb-2 cursor-pointer" onClick={handleProfileNav}>
                       <p className="text-white font-medium text-sm truncate">{user.name}</p>
                       <p className="text-gray-500 text-xs truncate">{user.handle}</p>
                    </div>
+                   <button onClick={handleProfileNav} className="w-full text-left px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-dark-700 flex items-center gap-2">
+                     <UserIcon size={14} /> Profile
+                   </button>
                    <button className="w-full text-left px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-dark-700 flex items-center gap-2">
                      <Settings size={14} /> Settings
                    </button>

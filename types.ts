@@ -1,3 +1,4 @@
+
 export type EntityType = 'MATCH' | 'PLAYER' | 'TEAM' | 'MANAGER';
 
 export interface Stat {
@@ -9,6 +10,13 @@ export interface NewsItem {
   title: string;
   source: string;
   date: string;
+}
+
+export interface LineupPlayer {
+  name: string;
+  number: number | string;
+  position?: string;
+  grid?: string;
 }
 
 export interface Entity {
@@ -29,18 +37,24 @@ export interface Review {
   entityId: string;
   userId: string;
   userName: string;
+  userAvatar?: string;
   rating: number; // 0.5 to 5.0
   comment: string;
   createdAt: string;
   likes: number;
+  // Snapshot details for Profile display
+  entityName?: string;
+  entityImage?: string;
+  entityType?: string;
 }
 
 export interface User {
   id: string;
   name: string;
-  handle: string;
+  handle: string; // email or custom handle
   avatar: string;
-  bio: string;
+  bio?: string;
+  uid?: string; // Firebase UID
 }
 
 export type MatchStatus = 'LIVE' | 'FT' | 'HT' | 'UPCOMING' | 'PPD';
@@ -66,8 +80,8 @@ export interface Match extends Entity {
   sourceUrl?: string;
   watchability?: number; // 0 to 15 scale
   lineups?: {
-    home: string[];
-    away: string[];
+    home: LineupPlayer[];
+    away: LineupPlayer[];
   };
 }
 
@@ -77,5 +91,9 @@ export enum League {
   BUNDESLIGA = 'Bundesliga',
   SERIE_A = 'Serie A',
   LIGUE_1 = 'Ligue 1',
+  PRIMEIRA_LIGA = 'Primeira Liga',
+  EREDIVISIE = 'Eredivisie',
+  BRASILEIRAO = 'Brasileirão',
+  MLS = 'MLS',
   CHAMPIONS_LEAGUE = 'Champions League'
 }

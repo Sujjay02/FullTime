@@ -1,10 +1,27 @@
+
 import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import MatchCard from './components/MatchCard';
 import ReviewModal from './components/ReviewModal';
 import EntityProfile from './components/EntityProfile';
-import { INITIAL_LIVE_MATCHES, INITIAL_EXCITING_MATCHES, INITIAL_HIGHEST_SCORING_MATCHES, MOCK_USER } from './constants';
-import { searchEntities, getEntityDetails, getLiveMatches, getExcitingMatches, getHighestScoringMatches } from './services/geminiService';
+import UserProfile from './components/UserProfile';
+import { INITIAL_LIVE_MATCHES, INITIAL_EXCITING_MATCHES, INITIAL_HIGHEST_SCORING_MATCHES } from './constants';
+// Import from footballService
+import { searchEntities, getLiveMatches, getExcitingMatches, getHighestScoringMatches } from './services/footballService';
+// Import Firebase services (Wrapper)
+import { 
+  auth, 
+  signInWithGoogle, 
+  logout, 
+  db,
+  onAuthStateChanged,
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  orderBy
+} from './services/firebase';
 import { User, Entity, Review, League, Match } from './types';
 import { Loader2, Plus, RefreshCw, Filter, Flame, TrendingUp, AlertCircle, X } from 'lucide-react';
 
@@ -14,8 +31,8 @@ const App: React.FC = () => {
   const [currentLeague, setCurrentLeague] = useState<League | null>(null);
   const [error, setError] = useState<string | null>(null);
   
-  // Navigation State (Simple Router)
-  const [view, setView] = useState<'HOME' | 'SEARCH' | 'DETAILS'>('HOME');
+  // Navigation State
+  const [view, setView] = useState<'HOME' | 'SEARCH' | 'DETAILS' | 'PROFILE'>('HOME');
   
   // Data State
   const [featuredMatches, setFeaturedMatches] = useState<Match[]>(INITIAL_LIVE_MATCHES);
@@ -26,33 +43,49 @@ const App: React.FC = () => {
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   
+  // Profile State
+  const [profileUser, setProfileUser] = useState<User | null>(null);
+  const [userReviews, setUserReviews] = useState<Review[]>([]);
+
   // UI State
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalEntity, setModalEntity] = useState<Entity | null>(null);
 
-  // Computed
-  const filteredMatches = currentLeague 
-    ? featuredMatches.filter(m => m.league === currentLeague)
-    : featuredMatches;
+  // -- Auth Observer --
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: any) => {
+      if (firebaseUser) {
+        setUser({
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || 'Anonymous',
+          handle: firebaseUser.email || '@user',
+          avatar: firebaseUser.photoURL || 'https://picsum.photos/100/100?random=1',
+          uid: firebaseUser.uid
+        });
+      } else {
+        setUser(null);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // -- Live Data Logic --
 
   const fetchLive = async () => {
     setIsRefreshing(true);
-    setError(null);
     try {
-        const liveData = await getLiveMatches();
+        const liveData = await getLiveMatches(currentLeague || undefined);
         if (liveData && liveData.length > 0) {
             setFeaturedMatches(liveData);
+            setError(null);
         } else {
-            // Keep existing/mock data if empty to avoid blank screen
-            setFeaturedMatches(INITIAL_LIVE_MATCHES);
+            setFeaturedMatches([]); 
         }
     } catch (err: any) {
         console.warn("Fetch Live error:", err);
-        setFeaturedMatches(INITIAL_LIVE_MATCHES); // Fallback
+        setFeaturedMatches(INITIAL_LIVE_MATCHES); 
         setError(err.message);
     } finally {
         setIsRefreshing(false);
@@ -66,9 +99,7 @@ const App: React.FC = () => {
             setExcitingMatches(data);
         }
     } catch (err: any) {
-        // Silent fail for secondary sections or show partial error
         console.warn("Fetch Exciting error:", err);
-        // Don't override main error if it exists, or maybe stack? keeping it simple.
     }
   };
 
@@ -83,26 +114,74 @@ const App: React.FC = () => {
     }
   };
 
+  const fetchReviews = async (entityId: string) => {
+      try {
+          const q = query(
+              collection(db, 'reviews'), 
+              where('entityId', '==', entityId),
+              orderBy('createdAt', 'desc')
+          );
+          const snapshot = await getDocs(q);
+          const fetchedReviews: Review[] = snapshot.docs.map((doc: any) => ({
+              id: doc.id,
+              ...doc.data()
+          } as Review));
+          setReviews(fetchedReviews);
+      } catch (err) {
+          console.warn("Failed to fetch reviews", err);
+          // Fallback to empty array but keep UI running
+          setReviews([]); 
+      }
+  };
+
+  const fetchUserReviews = async (userId: string) => {
+      setIsLoading(true);
+      try {
+          // Use 'where' clause for user ID
+          const q = query(
+              collection(db, 'reviews'), 
+              where('userId', '==', userId),
+              orderBy('createdAt', 'desc')
+          );
+          const snapshot = await getDocs(q);
+          const fetchedReviews: Review[] = snapshot.docs.map((doc: any) => ({
+              id: doc.id,
+              ...doc.data()
+          } as Review));
+          setUserReviews(fetchedReviews);
+      } catch (err) {
+          console.warn("Failed to fetch user reviews", err);
+          setUserReviews([]);
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
   useEffect(() => {
-    // Initial fetch
     fetchLive();
     fetchExciting();
     fetchHighestScoring();
 
-    // Set up polling interval to fetch fresh live data every 60 seconds
     const apiInterval = setInterval(() => {
         fetchLive();
-    }, 60000);
+    }, 300000);
 
-    return () => {
-        clearInterval(apiInterval);
-    };
-  }, []);
+    return () => clearInterval(apiInterval);
+  }, [currentLeague]); 
 
   // -- Handlers --
 
-  const handleLogin = () => setUser(MOCK_USER);
-  const handleLogout = () => setUser(null);
+  const handleLogin = async () => {
+      try {
+          await signInWithGoogle();
+      } catch (err: any) {
+          setError("Login failed. Check console or firebase config.");
+      }
+  };
+
+  const handleLogout = () => {
+      logout();
+  };
 
   const handleSearch = async (query: string) => {
     setIsLoading(true);
@@ -110,29 +189,7 @@ const App: React.FC = () => {
     setView('SEARCH');
 
     try {
-        // Build Personalized Context
-        let contextParts: string[] = [];
-        if (user) {
-            contextParts.push(`User Profile: ${user.bio}`);
-            const userReviews = reviews.filter(r => r.userId === user.id);
-            const reviewedIds = new Set(userReviews.map(r => r.entityId));
-            const allKnownEntities = [...featuredMatches, ...excitingMatches, ...highestScoringMatches, ...searchResults, ...(selectedEntity ? [selectedEntity] : [])];
-            const reviewedNames = allKnownEntities
-                .filter(e => reviewedIds.has(e.id))
-                .map(e => e.name);
-            
-            if (reviewedNames.length > 0) {
-                contextParts.push(`User Interests (Reviewed): ${Array.from(new Set(reviewedNames)).join(', ')}`);
-            }
-        }
-        
-        if (currentLeague) {
-            contextParts.push(`Current Browsing Filter: ${currentLeague}`);
-        }
-
-        const context = contextParts.join('. ');
-        
-        const results = await searchEntities(query, context);
+        const results = await searchEntities(query);
         setSearchResults(results);
     } catch (err: any) {
         setSearchResults([]);
@@ -145,21 +202,48 @@ const App: React.FC = () => {
   const handleEntityClick = async (entity: Entity) => {
     setIsLoading(true);
     setError(null);
-    let detailedEntity = entity;
-    
-    try {
-        // Always fetch details to get fresh stats/news even if we have some data
-        const details = await getEntityDetails(entity.name, entity.type);
-        if (details) detailedEntity = { ...entity, ...details };
-    } catch (err: any) {
-        // Soft error: show what we have but warn user
-        setError(`Could not load full details: ${err.message}`);
-    }
-    
-    setSelectedEntity(detailedEntity);
+    setSelectedEntity(entity);
     setView('DETAILS');
     setIsLoading(false);
     window.scrollTo(0, 0);
+    // Fetch reviews from firebase
+    fetchReviews(entity.id);
+  };
+
+  const handleProfileClick = async (profileUser: User) => {
+      setProfileUser(profileUser);
+      setView('PROFILE');
+      window.scrollTo(0, 0);
+      await fetchUserReviews(profileUser.id);
+  };
+
+  const handleGoToEntityFromProfile = async (entityId: string) => {
+     // Since we don't have the full entity object here easily without refetching,
+     // we could search for it or try to fetch details.
+     // For now, let's assume we can search by ID or handle it via search flow.
+     // Optimization: Store minimal entity data in Review to rebuild object or refetch.
+     // Simple workaround: Since we have the ID, we can use the searchEntities with ID 
+     // BUT currently search is name based. 
+     // Let's create a stub entity and let EntityProfile fetch details or just show what we have.
+     
+     // Note: In a real app, we'd fetch the entity by ID.
+     // Here, we check our current lists first.
+     const found = [...featuredMatches, ...excitingMatches, ...highestScoringMatches].find(m => m.id === entityId);
+     
+     if (found) {
+         handleEntityClick(found);
+     } else {
+        // Fallback: Create a skeleton entity with the ID and generic data, let the user see reviews
+        // This is imperfect but works for the mock data constraints
+        const skeleton: Entity = {
+            id: entityId,
+            name: 'Loading...',
+            type: 'MATCH', // Default assumption
+            image: 'https://picsum.photos/800/400',
+        };
+        // Ideally we would fetch details here.
+        handleEntityClick(skeleton);
+     }
   };
 
   const handleRateClick = (entity: Entity, e: React.MouseEvent) => {
@@ -172,19 +256,35 @@ const App: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSubmitReview = (rating: number, comment: string) => {
+  const handleSubmitReview = async (rating: number, comment: string) => {
     if (!modalEntity || !user) return;
-    const newReview: Review = {
-        id: `rev_${Date.now()}`,
-        entityId: modalEntity.id,
-        userId: user.id,
-        userName: user.name,
-        rating,
-        comment,
-        createdAt: new Date().toISOString(),
-        likes: 0
-    };
-    setReviews([newReview, ...reviews]);
+    
+    try {
+        const newReview: any = {
+            entityId: modalEntity.id,
+            userId: user.id,
+            userName: user.name,
+            userAvatar: user.avatar,
+            rating,
+            comment,
+            createdAt: new Date().toISOString(),
+            likes: 0,
+            // Capture entity snapshot for profile display
+            entityName: modalEntity.name,
+            entityImage: modalEntity.image,
+            entityType: modalEntity.type
+        };
+        const docRef = await addDoc(collection(db, 'reviews'), newReview);
+        
+        // Optimistic update if viewing details
+        if (selectedEntity?.id === modalEntity.id) {
+             const revWithId: Review = { id: docRef.id, ...newReview };
+             setReviews([revWithId, ...reviews]);
+        }
+    } catch (err: any) {
+        console.error("Error adding document: ", err);
+        setError("Could not save review. Is Firestore configured?");
+    }
   };
 
   // -- Render Helpers --
@@ -206,7 +306,7 @@ const App: React.FC = () => {
                 onClick={handleLogin}
                 className="bg-white text-dark-900 hover:bg-pitch-500 hover:text-white font-bold py-3 px-8 rounded-full transition transform hover:scale-105 duration-200"
               >
-                Get Started — It's Free
+                Sign In with Google
               </button>
            </div>
            {/* Decorative Background Elements */}
@@ -251,7 +351,7 @@ const App: React.FC = () => {
          </div>
          
          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {filteredMatches.map(match => (
+            {featuredMatches.map(match => (
                 <div key={match.id} className="relative group animate-in fade-in duration-500">
                     <MatchCard 
                         match={match} 
@@ -267,18 +367,18 @@ const App: React.FC = () => {
                      </button>
                 </div>
             ))}
-            {filteredMatches.length === 0 && (
+            {featuredMatches.length === 0 && (
                 <div className="col-span-full py-12 text-center text-gray-500">
                     {currentLeague 
-                        ? `No matches found in ${currentLeague} at the moment.` 
-                        : "No live matches found."}
+                        ? `No matches found in ${currentLeague} this week.` 
+                        : "No recent matches found."}
                 </div>
             )}
          </div>
-         {filteredMatches.some(m => m.sourceUrl) && (
+         {featuredMatches.some(m => m.sourceUrl) && (
             <div className="text-right mt-2">
-                <a href={filteredMatches.find(m => m.sourceUrl)?.sourceUrl} target="_blank" rel="noreferrer" className="text-[10px] text-gray-600 hover:text-gray-400">
-                    Data sourced via Google Search
+                <a href="https://www.api-football.com" target="_blank" rel="noreferrer" className="text-[10px] text-gray-600 hover:text-gray-400">
+                    Data provided by API-Football
                 </a>
             </div>
          )}
@@ -300,7 +400,6 @@ const App: React.FC = () => {
                         match={match}
                         onClick={() => handleEntityClick(match)}
                     />
-                    {/* Quick Rate Button (Desktop) */}
                     <button 
                         onClick={(e) => handleRateClick(match, e)}
                         className="absolute top-2 right-2 bg-black/50 hover:bg-pitch-600 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition duration-300 backdrop-blur-sm z-10"
@@ -311,13 +410,6 @@ const App: React.FC = () => {
                  </div>
              ))}
          </div>
-         {excitingMatches.some(m => m.sourceUrl) && (
-            <div className="text-right mt-2">
-                <a href={excitingMatches.find(m => m.sourceUrl)?.sourceUrl} target="_blank" rel="noreferrer" className="text-[10px] text-gray-600 hover:text-gray-400">
-                    Data sourced via Google Search
-                </a>
-            </div>
-         )}
       </section>
 
       {/* "Highest Scoring Games" Section */}
@@ -336,7 +428,6 @@ const App: React.FC = () => {
                         match={match}
                         onClick={() => handleEntityClick(match)}
                     />
-                    {/* Quick Rate Button (Desktop) */}
                     <button 
                         onClick={(e) => handleRateClick(match, e)}
                         className="absolute top-2 right-2 bg-black/50 hover:bg-pitch-600 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition duration-300 backdrop-blur-sm z-10"
@@ -347,13 +438,6 @@ const App: React.FC = () => {
                  </div>
              ))}
          </div>
-         {highestScoringMatches.some(m => m.sourceUrl) && (
-            <div className="text-right mt-2">
-                <a href={highestScoringMatches.find(m => m.sourceUrl)?.sourceUrl} target="_blank" rel="noreferrer" className="text-[10px] text-gray-600 hover:text-gray-400">
-                    Data sourced via Google Search
-                </a>
-            </div>
-         )}
       </section>
     </div>
   );
@@ -381,7 +465,7 @@ const App: React.FC = () => {
        </div>
        {!isLoading && searchResults.length === 0 && (
          <div className="text-center text-gray-500 py-20">
-            No results found. Try searching for "Messi" or "World Cup Final".
+            No results found. Try searching for "Manchester United" or "Real Madrid".
          </div>
        )}
     </div>
@@ -396,6 +480,7 @@ const App: React.FC = () => {
          onSearch={handleSearch}
          onSelectLeague={setCurrentLeague}
          onGoHome={() => { setView('HOME'); setSelectedEntity(null); }}
+         onProfileClick={handleProfileClick}
       />
       
       {/* Error Toast */}
@@ -417,9 +502,18 @@ const App: React.FC = () => {
          {view === 'DETAILS' && selectedEntity && (
            <EntityProfile 
               entity={selectedEntity} 
-              reviews={reviews.filter(r => r.entityId === selectedEntity.id)} 
+              reviews={reviews} 
               onRate={(e) => handleRateClick(selectedEntity, e)}
+              onUserClick={handleProfileClick}
            />
+         )}
+         {view === 'PROFILE' && profileUser && (
+            <UserProfile 
+                user={profileUser}
+                reviews={userReviews}
+                isOwnProfile={user?.id === profileUser.id}
+                onEntityClick={handleGoToEntityFromProfile}
+            />
          )}
       </main>
 
@@ -431,7 +525,7 @@ const App: React.FC = () => {
                  <span className="font-bold text-lg text-white">FullTime</span>
              </div>
              <div className="text-sm text-gray-500">
-                 © 2024 FullTime. The social network for football lovers. Data provided by Gemini AI.
+                 © 2024 FullTime. The social network for football lovers.
              </div>
              <div className="flex gap-4">
                  <a href="#" className="text-gray-500 hover:text-white transition">About</a>

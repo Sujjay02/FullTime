@@ -1,12 +1,14 @@
+
 import React from 'react';
-import { Entity, Review, Match } from '../types';
+import { Entity, Review, Match, User } from '../types';
 import StarRating from './StarRating';
-import { Trophy, TrendingUp, Newspaper, Users, Goal, Footprints, Shirt, Activity, Star, MapPin, User, Shield } from 'lucide-react';
+import { Trophy, TrendingUp, Newspaper, Users, Goal, Footprints, Shirt, Activity, Star, MapPin, Shield } from 'lucide-react';
 
 interface EntityProfileProps {
   entity: Entity;
   reviews: Review[];
   onRate: (e: React.MouseEvent) => void;
+  onUserClick?: (user: User) => void;
 }
 
 const getStatIcon = (label: string) => {
@@ -20,9 +22,21 @@ const getStatIcon = (label: string) => {
   return <Activity size={16} className="text-gray-500" />;
 };
 
-const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate }) => {
+const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate, onUserClick }) => {
   const isPersonOrTeam = entity.type === 'PLAYER' || entity.type === 'TEAM' || entity.type === 'MANAGER';
   const match = entity.type === 'MATCH' ? (entity as Match) : null;
+
+  const handleReviewerClick = (rev: Review) => {
+      if (onUserClick) {
+          onUserClick({
+              id: rev.userId,
+              name: rev.userName,
+              handle: `@${rev.userName.toLowerCase().replace(/\s/g, '')}`, // Approximate handle if missing
+              avatar: rev.userAvatar || 'https://picsum.photos/100/100',
+              uid: rev.userId
+          });
+      }
+  };
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -41,7 +55,7 @@ const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate }
         <div className="flex flex-col md:flex-row gap-8">
           {/* Main Poster */}
           <div className="w-48 md:w-64 shrink-0 mx-auto md:mx-0 shadow-2xl rounded-lg overflow-hidden border border-dark-600 bg-dark-800">
-            <img src={entity.image} alt={entity.name} className="w-full h-auto object-cover" />
+            <img src={entity.image} alt={entity.name} className="w-full h-full object-cover" />
           </div>
 
           {/* Info Block */}
@@ -130,9 +144,9 @@ const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate }
                        <div className="space-y-2">
                            {match.lineups.home.map((player, idx) => (
                                <div key={idx} className="flex items-center gap-3 group cursor-pointer hover:bg-white/10 p-1.5 rounded transition">
-                                   <span className="font-mono text-pitch-300 font-bold w-6 text-right">{idx + 1}</span>
+                                   <span className="font-mono text-pitch-300 font-bold w-6 text-right">{player.number}</span>
                                    <div className="flex flex-col">
-                                       <span className="text-white font-medium text-sm group-hover:text-pitch-300 transition">{player}</span>
+                                       <span className="text-white font-medium text-sm group-hover:text-pitch-300 transition">{player.name}</span>
                                    </div>
                                </div>
                            ))}
@@ -148,9 +162,9 @@ const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate }
                            {match.lineups.away.map((player, idx) => (
                                <div key={idx} className="flex items-center justify-end gap-3 group cursor-pointer hover:bg-white/10 p-1.5 rounded transition">
                                    <div className="flex flex-col items-end">
-                                       <span className="text-white font-medium text-sm group-hover:text-blue-300 transition">{player}</span>
+                                       <span className="text-white font-medium text-sm group-hover:text-blue-300 transition">{player.name}</span>
                                    </div>
-                                   <span className="font-mono text-blue-300 font-bold w-6 text-left">{idx + 1}</span>
+                                   <span className="font-mono text-blue-300 font-bold w-6 text-left">{player.number}</span>
                                </div>
                            ))}
                        </div>
@@ -177,11 +191,11 @@ const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate }
                 reviews.map(rev => (
                   <div key={rev.id} className="bg-dark-800 p-6 rounded-lg border border-dark-700">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-xs font-bold">
-                        {rev.userName.charAt(0)}
+                      <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-xs font-bold overflow-hidden cursor-pointer hover:opacity-80 transition" onClick={() => handleReviewerClick(rev)}>
+                        {rev.userAvatar ? <img src={rev.userAvatar} alt={rev.userName} className="w-full h-full object-cover"/> : rev.userName.charAt(0)}
                       </div>
                       <div className="flex-1">
-                        <div className="text-sm font-bold text-gray-200">Review by <span className="text-white">{rev.userName}</span></div>
+                        <div className="text-sm font-bold text-gray-200">Review by <span className="text-white hover:text-pitch-400 cursor-pointer transition" onClick={() => handleReviewerClick(rev)}>{rev.userName}</span></div>
                         <div className="flex items-center gap-2">
                           <StarRating rating={rev.rating} size={12} />
                         </div>
