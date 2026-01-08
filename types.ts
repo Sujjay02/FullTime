@@ -15,8 +15,10 @@ export interface NewsItem {
 export interface LineupPlayer {
   name: string;
   number: number | string;
-  position?: string;
-  grid?: string;
+  position: string; // GK, DEF, MID, FWD
+  role?: string; // e.g. "Captain", "Playmaker"
+  goals?: number;
+  assists?: number;
 }
 
 export interface Entity {
@@ -25,8 +27,8 @@ export interface Entity {
   type: EntityType;
   image?: string;
   imageCredit?: string;
-  subtitle?: string; // e.g., "FWD - Manchester City" or "Premier League • Week 12"
-  rating?: number; // Average rating
+  subtitle?: string; 
+  rating?: number;
   description?: string;
   stats?: Stat[];
   news?: NewsItem[];
@@ -38,34 +40,45 @@ export interface Review {
   userId: string;
   userName: string;
   userAvatar?: string;
-  rating: number; // 0.5 to 5.0
+  rating: number; 
   comment: string;
   createdAt: string;
   likes: number;
-  // Snapshot details for Profile display
   entityName?: string;
   entityImage?: string;
   entityType?: string;
 }
 
+export interface Playlist {
+  id: string;
+  name: string;
+  description: string;
+  userId: string;
+  matchIds: string[];
+  createdAt: string;
+  // Metadata for cover
+  coverImage?: string;
+}
+
 export interface User {
   id: string;
   name: string;
-  handle: string; // email or custom handle
+  handle: string;
   avatar: string;
   bio?: string;
-  uid?: string; // Firebase UID
+  uid?: string;
 }
 
 export type MatchStatus = 'LIVE' | 'FT' | 'HT' | 'UPCOMING' | 'PPD';
 
 export interface MatchEvent {
   id: string;
-  type: 'GOAL' | 'CARD' | 'SUB';
+  type: 'GOAL' | 'CARD' | 'SUB' | 'VAR';
   minute: string;
   player: string;
+  playerOut?: string; // For subs
   team: 'HOME' | 'AWAY';
-  detail?: string;
+  detail?: string; // e.g. "Yellow", "Red", "Penalty"
 }
 
 export interface Match extends Entity {
@@ -73,16 +86,33 @@ export interface Match extends Entity {
   homeTeam: string;
   awayTeam: string;
   score?: string;
-  minute?: string; // e.g., "45+2'" or "FT"
+  minute?: string; 
   league: string;
   status?: MatchStatus;
   events?: MatchEvent[];
   sourceUrl?: string;
-  watchability?: number; // 0 to 15 scale
+  watchability?: number;
+  formation?: {
+    home: string; // e.g. "4-3-3"
+    away: string;
+  };
   lineups?: {
     home: LineupPlayer[];
     away: LineupPlayer[];
   };
+  bench?: {
+    home: LineupPlayer[];
+    away: LineupPlayer[];
+  };
+}
+
+export interface LeagueMetric {
+  id: string;
+  name: string;
+  avgWatchability: number;
+  matchCount: number;
+  topMatch?: Match;
+  logo?: string;
 }
 
 export enum League {
@@ -91,9 +121,6 @@ export enum League {
   BUNDESLIGA = 'Bundesliga',
   SERIE_A = 'Serie A',
   LIGUE_1 = 'Ligue 1',
-  PRIMEIRA_LIGA = 'Primeira Liga',
-  EREDIVISIE = 'Eredivisie',
-  BRASILEIRAO = 'Brasileirão',
   MLS = 'MLS',
   CHAMPIONS_LEAGUE = 'Champions League'
 }

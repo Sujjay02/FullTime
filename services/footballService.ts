@@ -1,314 +1,363 @@
-import { Entity, EntityType, Match, MatchStatus, League, LineupPlayer } from "../types";
+
+import { GoogleGenAI, Type } from "@google/genai";
+import { Entity, EntityType, Match, MatchStatus, League, LeagueMetric } from "../types";
 import { getCachedData, setCachedData } from "./cacheService";
-import { INITIAL_LIVE_MATCHES, INITIAL_EXCITING_MATCHES, INITIAL_HIGHEST_SCORING_MATCHES } from "../constants";
+import { INITIAL_LIVE_MATCHES, INITIAL_EXCITING_MATCHES, INITIAL_HIGHEST_SCORING_MATCHES, getGenericImage } from "../constants";
 
-// Configuration
-const API_KEY = '5dd5cbde6103584e1500b93af8ac77b0';
-const BASE_URL = 'https://v3.football.api-sports.io';
-const HEADERS = {
-  'x-rapidapi-host': 'v3.football.api-sports.io',
-  'x-rapidapi-key': API_KEY
+// Initialize Gemini API client directly with process.env.API_KEY following strict guidelines
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const modelName = "gemini-3-flash-preview";
+
+const normalizeLeague = (input: string): string => {
+  if (!input) return 'Unknown League';
+  const l = input.toLowerCase();
+  if (l.includes('premier')) return League.PREMIER_LEAGUE;
+  if (l.includes('la liga')) return League.LA_LIGA;
+  if (l.includes('bundesliga')) return League.BUNDESLIGA;
+  if (l.includes('serie a')) return League.SERIE_A;
+  if (l.includes('ligue 1')) return League.LIGUE_1;
+  if (l.includes('mls')) return League.MLS;
+  if (l.includes('champions')) return League.CHAMPIONS_LEAGUE;
+  return input;
 };
 
-// Map Enum strings to API-Football League IDs (Top 10)
-const LEAGUE_IDS: Record<string, number> = {
-    [League.PREMIER_LEAGUE]: 39,
-    [League.LA_LIGA]: 140,
-    [League.BUNDESLIGA]: 78,
-    [League.SERIE_A]: 135,
-    [League.LIGUE_1]: 61,
-    [League.PRIMEIRA_LIGA]: 94,
-    [League.EREDIVISIE]: 88,
-    [League.BRASILEIRAO]: 71,
-    [League.MLS]: 253,
-    [League.CHAMPIONS_LEAGUE]: 2
+const handleApiError = (error: any, context: string, fallback: any) => {
+  console.warn(`Gemini Error (${context}):`, error);
+  return fallback;
 };
 
-// Create a Set of allowed IDs for efficient filtering
-const ALLOWED_LEAGUE_IDS = new Set(Object.values(LEAGUE_IDS));
-
-// --- Helpers ---
-
-// Generate a scenic image for the city using a generative AI proxy
-const getCityImage = (city: string) => {
-    if (!city) return 'https://images.unsplash.com/photo-1522770179533-24471fcdba45?w=800&auto=format&fit=crop';
-    const prompt = `${city} city soccer stadium skyline architecture dramatic lighting`;
-    return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=450&nologo=true&seed=${encodeURIComponent(city)}`;
-};
-
-// Map API-Football Status to our MatchStatus
-const mapStatus = (statusShort: string): MatchStatus => {
-    switch (statusShort) {
-        case '1H': case '2H': case 'ET': case 'P': case 'BT': case 'LIVE': return 'LIVE';
-        case 'HT': return 'HT';
-        case 'FT': case 'AET': case 'PEN': return 'FT';
-        case 'NS': case 'TBD': return 'UPCOMING';
-        case 'PST': case 'CANC': case 'ABD': case 'SUSP': return 'PPD';
-        default: return 'LIVE'; 
-    }
-};
-
-// Calculate internal watchability score
-const calculateWatchability = (homeGoals: number, awayGoals: number, status: string): number => {
-    const totalGoals = homeGoals + awayGoals;
-    const diff = Math.abs(homeGoals - awayGoals);
-    let score = (totalGoals * 2) + (diff <= 1 ? 3 : 0);
-    if (['1H', '2H', 'ET', 'LIVE'].includes(status)) score += 2;
-    return Math.min(score, 15);
-};
-
-// Extract lineups if available
-const extractLineups = (fixture: any): { home: LineupPlayer[], away: LineupPlayer[] } | undefined => {
-    if (!fixture.lineups || fixture.lineups.length < 2) return undefined;
-    const homeData = fixture.lineups[0];
-    const awayData = fixture.lineups[1];
-    if (!homeData?.startXI || !awayData?.startXI) return undefined;
-
-    return {
-        home: homeData.startXI.map((p: any) => ({
-            name: p.player.name,
-            number: p.player.number,
-            position: p.player.pos,
-            grid: p.player.grid
-        })),
-        away: awayData.startXI.map((p: any) => ({
-            name: p.player.name,
-            number: p.player.number,
-            position: p.player.pos,
-            grid: p.player.grid
-        }))
-    };
-};
-
-// Transform API Fixture to our Match Entity
-const transformFixture = (fixture: any): Match => {
-    const homeGoals = fixture.goals.home ?? 0;
-    const awayGoals = fixture.goals.away ?? 0;
-    const venueCity = fixture.fixture.venue.city || 'Unknown City';
-    
-    return {
-        id: `api_${fixture.fixture.id}`,
-        name: `${fixture.teams.home.name} vs ${fixture.teams.away.name}`,
-        type: 'MATCH',
-        homeTeam: fixture.teams.home.name,
-        awayTeam: fixture.teams.away.name,
-        score: `${homeGoals} - ${awayGoals}`,
-        minute: fixture.fixture.status.elapsed ? `${fixture.fixture.status.elapsed}'` : fixture.fixture.status.short,
-        league: fixture.league.name,
-        status: mapStatus(fixture.fixture.status.short),
-        image: getCityImage(venueCity),
-        imageCredit: 'AI Generated',
-        subtitle: `${fixture.league.name} • ${venueCity}`,
-        rating: 0,
-        watchability: calculateWatchability(homeGoals, awayGoals, fixture.fixture.status.short),
-        events: [],
-        lineups: extractLineups(fixture),
-        sourceUrl: `https://www.api-football.com`
-    };
-};
-
-const getDateParams = (daysAgo: number) => {
-    const today = new Date();
-    const past = new Date(today);
-    past.setDate(today.getDate() - daysAgo);
-    return {
-        from: past.toISOString().split('T')[0],
-        to: today.toISOString().split('T')[0]
-    };
-};
-
-// --- API Methods ---
-
-const fetchFromApi = async (endpoint: string, params: Record<string, string>, ttl: number) => {
-    if (!API_KEY) throw new Error("API Key missing");
-    
-    const queryString = new URLSearchParams(params).toString();
-    const url = `${BASE_URL}${endpoint}?${queryString}`;
-    const cacheKey = `${endpoint}_${queryString}`;
-
-    const cached = getCachedData(cacheKey);
-    if (cached) {
-        console.log(`[Cache Hit] Serving ${cacheKey} from local storage.`);
-        return cached;
-    }
-
-    console.log(`[Network Request] Fetching ${url} ...`);
-
-    try {
-        const response = await fetch(url, { headers: HEADERS });
-        if (!response.ok) {
-            const errorBody = await response.json().catch(() => ({}));
-            throw new Error(errorBody.message || `API Error: ${response.status}`);
+const LINEUP_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    homeTeam: { type: Type.STRING },
+    awayTeam: { type: Type.STRING },
+    score: { type: Type.STRING },
+    minute: { type: Type.STRING },
+    status: { type: Type.STRING },
+    league: { type: Type.STRING },
+    watchability: { type: Type.NUMBER },
+    formationHome: { type: Type.STRING },
+    formationAway: { type: Type.STRING },
+    lineupHome: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          number: { type: Type.NUMBER },
+          position: { type: Type.STRING },
+          goals: { type: Type.NUMBER, description: "Total goals this season" },
+          assists: { type: Type.NUMBER, description: "Total assists this season" }
         }
-        
-        const json = await response.json();
-        
-        const hasErrors = Array.isArray(json.errors) 
-            ? json.errors.length > 0 
-            : Object.keys(json.errors).length > 0;
-
-        if (hasErrors) {
-            const errorDetail = JSON.stringify(json.errors);
-            console.error("API-Football Error:", json.errors);
-            throw new Error(`API Error: ${errorDetail}`);
+      }
+    },
+    lineupAway: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          number: { type: Type.NUMBER },
+          position: { type: Type.STRING },
+          goals: { type: Type.NUMBER, description: "Total goals this season" },
+          assists: { type: Type.NUMBER, description: "Total assists this season" }
         }
-
-        const data = json.response;
-        setCachedData(cacheKey, data, ttl);
-        return data;
-    } catch (error) {
-        console.error(`Fetch error for ${url}:`, error);
-        throw error;
+      }
+    },
+    benchHome: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          number: { type: Type.NUMBER },
+          position: { type: Type.STRING },
+          goals: { type: Type.NUMBER },
+          assists: { type: Type.NUMBER }
+        }
+      }
+    },
+    benchAway: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          number: { type: Type.NUMBER },
+          position: { type: Type.STRING },
+          goals: { type: Type.NUMBER },
+          assists: { type: Type.NUMBER }
+        }
+      }
+    },
+    events: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          type: { type: Type.STRING }, // GOAL, CARD, SUB
+          minute: { type: Type.STRING },
+          player: { type: Type.STRING },
+          playerOut: { type: Type.STRING },
+          team: { type: Type.STRING }, // HOME or AWAY
+          detail: { type: Type.STRING }
+        }
+      }
     }
+  }
+};
+
+/**
+ * Helper to ensure we have valid home and away team names even if AI deviates from schema keys.
+ */
+const extractTeams = (item: any) => {
+  const home = item.homeTeam || item.home || item.teamHome || "Home Team";
+  const away = item.awayTeam || item.away || item.teamAway || "Away Team";
+  return { home, away };
 };
 
 export const getLiveMatches = async (leagueName?: string): Promise<Match[]> => {
-    try {
-        let params: Record<string, string> = { live: 'all' };
-        
-        if (leagueName && LEAGUE_IDS[leagueName]) {
-            params.league = LEAGUE_IDS[leagueName].toString();
-        }
+  const cacheKey = `live_v2_${leagueName || 'all'}`;
+  const cached = getCachedData<Match[]>(cacheKey);
+  if (cached) return cached;
+  if (!process.env.API_KEY) return INITIAL_LIVE_MATCHES;
 
-        let data = await fetchFromApi('/fixtures', params, 600); 
-
-        // If no live matches, fetch today's matches to ensure content exists for "This Week" requirement
-        if (!data || data.length === 0) {
-            console.log("No live matches, fetching today's fixtures...");
-            const { from, to } = getDateParams(0); // Today
-            const leagueId = (leagueName && LEAGUE_IDS[leagueName]) 
-                ? LEAGUE_IDS[leagueName] 
-                : LEAGUE_IDS[League.PREMIER_LEAGUE]; // Fallback to PL
-            
-            params = {
-                from,
-                to,
-                league: leagueId.toString(),
-                season: '2024'
-            };
-            
-            data = await fetchFromApi('/fixtures', params, 3600);
+  try {
+    const now = new Date().toLocaleString('en-US', { timeZone: 'UTC' });
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: `Find live or recent soccer matches for today ${now}. 
+      For each match, provide the ACCURATE Starting XI, Bench, and Events.
+      Include goals/assists season stats. 
+      If no matches are currently live, find the latest completed or upcoming ones for TODAY.`,
+      config: {
+        tools: [{googleSearch: {}}],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: LINEUP_SCHEMA
         }
-        
-        // Filter strictly if using 'all' live matches (only top leagues)
-        const filteredData = data.filter((item: any) => ALLOWED_LEAGUE_IDS.has(item.league.id));
-        
-        const matches = filteredData.map(transformFixture);
-        
-        // Sort: Live/In-Play first, then by date
-        matches.sort((a, b) => {
-             if (a.status === 'LIVE' && b.status !== 'LIVE') return -1;
-             if (b.status === 'LIVE' && a.status !== 'LIVE') return 1;
-             return 0;
-        });
+      }
+    });
 
-        return matches.length > 0 ? matches : INITIAL_LIVE_MATCHES;
-    } catch (error) {
-        console.warn("Live API failed, using mock:", error);
-        if (leagueName) {
-            return INITIAL_LIVE_MATCHES.filter(m => m.league === leagueName);
-        }
-        return INITIAL_LIVE_MATCHES;
-    }
+    const data = JSON.parse(response.text || "[]");
+    const matches = data.map((item: any) => {
+      const { home, away } = extractTeams(item);
+      const id = `match_${home}_${away}`.replace(/\s/g, '').toLowerCase();
+      const leagueStr = normalizeLeague(item.league);
+      return {
+        id,
+        name: `${home} vs ${away}`,
+        type: 'MATCH',
+        homeTeam: home,
+        awayTeam: away,
+        score: item.score || '0-0',
+        minute: item.minute || 'UPCOMING',
+        league: leagueStr,
+        status: (item.status?.toUpperCase() as MatchStatus) || 'LIVE',
+        image: getGenericImage(id),
+        watchability: item.watchability || 5,
+        subtitle: `${leagueStr} • ${item.minute || 'Upcoming'}`,
+        formation: { home: item.formationHome || "4-3-3", away: item.formationAway || "4-3-3" },
+        lineups: { home: item.lineupHome || [], away: item.lineupAway || [] },
+        bench: { home: item.benchHome || [], away: item.benchAway || [] },
+        events: item.events || []
+      };
+    });
+
+    setCachedData(cacheKey, matches, 300);
+    return matches;
+  } catch (error) {
+    return handleApiError(error, "Live Matches", INITIAL_LIVE_MATCHES);
+  }
 };
 
-export const getExcitingMatches = async (leagueName?: string): Promise<Match[]> => {
-    try {
-        const leagueId = (leagueName && LEAGUE_IDS[leagueName]) 
-            ? LEAGUE_IDS[leagueName] 
-            : LEAGUE_IDS[League.PREMIER_LEAGUE];
+export const getExcitingMatches = async (): Promise<Match[]> => {
+  const cacheKey = 'exciting_v2';
+  const cached = getCachedData<Match[]>(cacheKey);
+  if (cached) return cached;
+  if (!process.env.API_KEY) return INITIAL_EXCITING_MATCHES;
 
-        const { from, to } = getDateParams(7);
-
-        const params: Record<string, string> = { 
-            league: leagueId.toString(),
-            season: '2024', // Ensure this matches current API season
-            from,
-            to
-        }; 
-        
-        // Cache for 1 Hour
-        const data = await fetchFromApi('/fixtures', params, 3600);
-        
-        const matches: Match[] = data.map(transformFixture);
-        
-        const exciting = matches
-            .filter(m => {
-                const [h, a] = (m.score || "0 - 0").split(' - ').map(Number);
-                // Simple exciting logic: 3+ goals or very close game
-                return (h + a >= 3) || (Math.abs(h - a) <= 1);
-            })
-            .sort((a, b) => (b.watchability || 0) - (a.watchability || 0))
-            .slice(0, 4);
-
-        return exciting.length > 0 ? exciting : INITIAL_EXCITING_MATCHES;
-    } catch (error) {
-        console.warn("Exciting API failed, using mock:", error);
-        return INITIAL_EXCITING_MATCHES;
-    }
+  try {
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: "Find 4 high-drama soccer matches from the last 7 days with full lineups, season stats, and event timelines.",
+      config: {
+        tools: [{googleSearch: {}}],
+        responseMimeType: "application/json",
+        responseSchema: { type: Type.ARRAY, items: LINEUP_SCHEMA }
+      }
+    });
+    const data = JSON.parse(response.text || "[]");
+    const matches = data.map((item: any) => {
+      const { home, away } = extractTeams(item);
+      const id = `ex_${home}_${away}`.replace(/\s/g, '').toLowerCase();
+      const leagueStr = normalizeLeague(item.league);
+      return {
+        id,
+        name: `${home} vs ${away}`,
+        type: 'MATCH',
+        homeTeam: home,
+        awayTeam: away,
+        score: item.score || '0-0',
+        minute: "FT",
+        status: 'FT',
+        league: leagueStr,
+        subtitle: `${leagueStr} • Thriller`,
+        image: getGenericImage(id),
+        watchability: item.watchability || 12,
+        lineups: { home: item.lineupHome || [], away: item.lineupAway || [] },
+        bench: { home: item.benchHome || [], away: item.benchAway || [] },
+        events: item.events || []
+      };
+    });
+    setCachedData(cacheKey, matches, 3600);
+    return matches;
+  } catch (error) {
+    return handleApiError(error, "Exciting", INITIAL_EXCITING_MATCHES);
+  }
 };
 
-export const getHighestScoringMatches = async (leagueName?: string): Promise<Match[]> => {
-    try {
-        // Same restrictions as above apply
-        const leagueId = (leagueName && LEAGUE_IDS[leagueName]) 
-            ? LEAGUE_IDS[leagueName] 
-            : LEAGUE_IDS[League.PREMIER_LEAGUE];
+export const getHighestScoringMatches = async (): Promise<Match[]> => {
+  const cacheKey = 'high_scoring_v2';
+  const cached = getCachedData<Match[]>(cacheKey);
+  if (cached) return cached;
+  if (!process.env.API_KEY) return INITIAL_HIGHEST_SCORING_MATCHES;
 
-        const { from, to } = getDateParams(7);
+  try {
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: "Find 4 high-scoring soccer matches from the last 7 days with full match data and player season stats.",
+      config: {
+        tools: [{googleSearch: {}}],
+        responseMimeType: "application/json",
+        responseSchema: { type: Type.ARRAY, items: LINEUP_SCHEMA }
+      }
+    });
+    const data = JSON.parse(response.text || "[]");
+    const matches = data.map((item: any) => {
+      const { home, away } = extractTeams(item);
+      const id = `hs_${home}_${away}`.replace(/\s/g, '').toLowerCase();
+      const leagueStr = normalizeLeague(item.league);
+      return {
+        id,
+        name: `${home} vs ${away}`,
+        type: 'MATCH',
+        homeTeam: home,
+        awayTeam: away,
+        score: item.score || '0-0',
+        league: leagueStr,
+        subtitle: `${leagueStr} • Goal Fest`,
+        status: 'FT',
+        image: getGenericImage(id),
+        lineups: { home: item.lineupHome || [], away: item.lineupAway || [] },
+        bench: { home: item.benchHome || [], away: item.benchAway || [] },
+        events: item.events || []
+      } as Match;
+    });
+    setCachedData(cacheKey, matches, 3600);
+    return matches;
+  } catch (error) {
+    return handleApiError(error, "Scoring", INITIAL_HIGHEST_SCORING_MATCHES);
+  }
+};
 
-        const params: Record<string, string> = { 
-            league: leagueId.toString(),
-            season: '2024',
-            from,
-            to
-        };
+export const getLeagueMetrics = async (): Promise<LeagueMetric[]> => {
+  if (!process.env.API_KEY) return [];
+  try {
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: "Rank the top 5 European soccer leagues based on current season entertainment and watchability. Include the 'match of the week' for each league with its lineups.",
+      config: {
+        tools: [{googleSearch: {}}],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              leagueName: { type: Type.STRING },
+              avgWatchability: { type: Type.NUMBER },
+              matchCount: { type: Type.NUMBER, description: "Number of matches analyzed" },
+              topMatch: LINEUP_SCHEMA
+            }
+          }
+        }
+      }
+    });
+    const data = JSON.parse(response.text || "[]");
+    return data.map((item: any, idx: number) => {
+      const lgName = normalizeLeague(item.leagueName);
+      let mappedTopMatch: Match | undefined = undefined;
+      
+      if (item.topMatch) {
+         const { home, away } = extractTeams(item.topMatch);
+         const tmId = `tm_${lgName}_${idx}`.replace(/\s/g, '');
+         mappedTopMatch = {
+            id: tmId,
+            name: `${home} vs ${away}`,
+            type: 'MATCH',
+            homeTeam: home,
+            awayTeam: away,
+            score: item.topMatch.score || '0-0',
+            minute: item.topMatch.minute || 'FT',
+            status: (item.topMatch.status?.toUpperCase() as MatchStatus) || 'FT',
+            league: lgName,
+            subtitle: `${lgName} • Featured`,
+            image: getGenericImage(tmId),
+            watchability: item.topMatch.watchability || 8.0,
+            formation: { home: item.topMatch.formationHome || "4-3-3", away: item.topMatch.formationAway || "4-3-3" },
+            lineups: { home: item.topMatch.lineupHome || [], away: item.topMatch.lineupAway || [] },
+            bench: { home: item.topMatch.benchHome || [], away: item.topMatch.benchAway || [] },
+            events: item.topMatch.events || []
+         };
+      }
 
-        const data = await fetchFromApi('/fixtures', params, 3600);
-        
-        const matches: Match[] = data.map(transformFixture);
-        
-        const highest = matches
-            .sort((a, b) => {
-                const [h1, a1] = (a.score || "0 - 0").split(' - ').map(Number);
-                const [h2, a2] = (b.score || "0 - 0").split(' - ').map(Number);
-                return (h2 + a2) - (h1 + a1);
-            })
-            .slice(0, 4);
-
-        return highest.length > 0 ? highest : INITIAL_HIGHEST_SCORING_MATCHES;
-    } catch (error) {
-        console.warn("Highest Scoring API failed, using mock:", error);
-        return INITIAL_HIGHEST_SCORING_MATCHES;
-    }
+      return {
+        id: `lg_${idx}`,
+        name: lgName,
+        avgWatchability: item.avgWatchability || 7.0,
+        matchCount: item.matchCount || 10,
+        logo: `https://ui-avatars.com/api/?name=${encodeURIComponent(lgName)}&background=random&color=fff`,
+        topMatch: mappedTopMatch
+      };
+    });
+  } catch (error) {
+    return [];
+  }
 };
 
 export const searchEntities = async (query: string): Promise<Entity[]> => {
-    if (!query) return [];
-
-    try {
-        const data = await fetchFromApi('/teams', { search: query }, 86400); 
-        
-        return data.slice(0, 6).map((item: any) => ({
-            id: `team_${item.team.id}`,
-            name: item.team.name,
-            type: 'TEAM',
-            image: item.team.logo,
-            subtitle: item.venue.city ? `Team • ${item.venue.city}` : 'Football Team',
-            rating: 4.0,
-            description: `Professional football club based in ${item.venue.city}. Plays at ${item.venue.name} (Capacity: ${item.venue.capacity}).`,
-            stats: [
-                { label: 'Founded', value: item.team.founded || 'Unknown' },
-                { label: 'Venue', value: item.venue.name },
-                { label: 'Capacity', value: item.venue.capacity }
-            ]
-        }));
-    } catch (error) {
-        console.warn("Search API failed:", error);
-        return [];
-    }
-};
-
-export const getEntityDetails = async (entity: Entity): Promise<Entity | null> => {
-    return entity; 
+  if (!process.env.API_KEY || !query) return [];
+  try {
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: `Search for soccer entities: "${query}".`,
+      config: {
+        tools: [{googleSearch: {}}],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING },
+              type: { type: Type.STRING },
+              subtitle: { type: Type.STRING },
+              rating: { type: Type.NUMBER }
+            }
+          }
+        }
+      }
+    });
+    const data = JSON.parse(response.text || "[]");
+    return data.map((item: any, idx: number) => ({
+      ...item,
+      id: `s_${idx}_${Date.now()}`,
+      image: getGenericImage(item.name),
+      type: (item.type?.toUpperCase() as EntityType) || 'TEAM'
+    }));
+  } catch (error) {
+    return [];
+  }
 };

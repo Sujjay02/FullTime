@@ -14,7 +14,9 @@ import {
   query as firebaseQuery, 
   where as firebaseWhere, 
   getDocs as firebaseGetDocs, 
-  orderBy as firebaseOrderBy 
+  orderBy as firebaseOrderBy,
+  updateDoc as firebaseUpdateDoc,
+  doc as firebaseDoc
 } from 'firebase/firestore';
 
 // --- FIREBASE CONFIGURATION ---
@@ -72,9 +74,20 @@ let _onAuthStateChanged = (auth: any, cb: any): any => {};
 let _collection = (db: any, name: string): any => {};
 let _addDoc = async (ref: any, data: any): Promise<any> => {};
 let _getDocs = async (q: any): Promise<any> => {};
+let _updateDoc = async (ref: any, data: any): Promise<void> => {};
+let _doc = (db: any, path: string, ...pathSegments: string[]): any => {};
 let _query = (ref: any, ...constraints: any[]): any => {};
 let _where = (field: string, op: string, val: any): any => {};
 let _orderBy = (field: string, dir: string): any => {};
+
+// In-Memory Storage for Mock Mode (replaces localStorage)
+const memoryStorage = new Map<string, string>();
+
+const safeStorage = {
+  getItem: (key: string) => memoryStorage.get(key) || null,
+  setItem: (key: string, value: string) => memoryStorage.set(key, value),
+  removeItem: (key: string) => memoryStorage.delete(key)
+};
 
 // --- IMPLEMENTATION SELECTION ---
 
@@ -104,6 +117,8 @@ if (isFirebaseConfigured) {
     _collection = firebaseCollection;
     _addDoc = firebaseAddDoc;
     _getDocs = firebaseGetDocs;
+    _updateDoc = firebaseUpdateDoc;
+    _doc = firebaseDoc;
     _query = firebaseQuery;
     _where = firebaseWhere;
     _orderBy = firebaseOrderBy;
@@ -133,21 +148,21 @@ function initMockMode() {
 
   _signInWithGoogle = async () => {
     await new Promise(r => setTimeout(r, 800)); // Simulate network
-    localStorage.setItem('ft_mock_user', JSON.stringify(MOCK_USER));
+    safeStorage.setItem('ft_mock_user', JSON.stringify(MOCK_USER));
     auth.currentUser = MOCK_USER;
     window.dispatchEvent(new Event('mock-auth-change'));
     return MOCK_USER;
   };
 
   _logout = async () => {
-    localStorage.removeItem('ft_mock_user');
+    safeStorage.removeItem('ft_mock_user');
     auth.currentUser = null;
     window.dispatchEvent(new Event('mock-auth-change'));
   };
 
   _onAuthStateChanged = (authInstance: any, callback: any) => {
     const checkUser = () => {
-       const u = localStorage.getItem('ft_mock_user');
+       const u = safeStorage.getItem('ft_mock_user');
        const user = u ? JSON.parse(u) : null;
        authInstance.currentUser = user;
        callback(user);
@@ -158,9 +173,25 @@ function initMockMode() {
     return () => window.removeEventListener('mock-auth-change', checkUser);
   };
 
-  // Mock Firestore (LocalStorage)
+  // Mock Firestore (In-Memory)
   _collection = (db: any, name: string) => ({ type: 'collection', path: name });
   
+  // Implement mock doc function
+  _doc = (db: any, path: string, id: string) => ({ type: 'doc', path, id });
+
+  // Implement mock updateDoc function
+  _updateDoc = async (docRef: any, data: any) => {
+      const path = docRef.path;
+      const key = `ft_db_${path}`;
+      let existing = JSON.parse(safeStorage.getItem(key) || '[]');
+      const index = existing.findIndex((d: any) => d.id === docRef.id);
+      if (index !== -1) {
+          existing[index] = { ...existing[index], ...data };
+          safeStorage.setItem(key, JSON.stringify(existing));
+      }
+      await new Promise(r => setTimeout(r, 400));
+  };
+
   _query = (collectionRef: any, ...constraints: any[]) => ({ 
       type: 'query', 
       collection: collectionRef.path, 
@@ -173,10 +204,10 @@ function initMockMode() {
   _addDoc = async (collectionRef: any, data: any) => {
       const path = collectionRef.path;
       const key = `ft_db_${path}`;
-      const existing = JSON.parse(localStorage.getItem(key) || '[]');
+      const existing = JSON.parse(safeStorage.getItem(key) || '[]');
       const newDoc = { id: `doc_${Date.now()}_${Math.random().toString(36).substr(2,9)}`, ...data };
       existing.push(newDoc);
-      localStorage.setItem(key, JSON.stringify(existing));
+      safeStorage.setItem(key, JSON.stringify(existing));
       await new Promise(r => setTimeout(r, 400));
       return { id: newDoc.id };
   };
@@ -185,7 +216,7 @@ function initMockMode() {
       await new Promise(r => setTimeout(r, 400));
       const path = queryObj.collection || queryObj.path; 
       const key = `ft_db_${path}`;
-      let data = JSON.parse(localStorage.getItem(key) || '[]');
+      let data = JSON.parse(safeStorage.getItem(key) || '[]');
 
       if (queryObj.constraints) {
           queryObj.constraints.forEach((c: any) => {
@@ -221,6 +252,8 @@ export {
   _collection as collection,
   _addDoc as addDoc,
   _getDocs as getDocs,
+  _updateDoc as updateDoc,
+  _doc as doc,
   _query as query,
   _where as where,
   _orderBy as orderBy
