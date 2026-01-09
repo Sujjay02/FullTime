@@ -26,12 +26,12 @@ import {
 // 3. Paste the values into MANUAL_CONFIG below OR use environment variables.
 
 const MANUAL_CONFIG = {
-  apiKey: "", // e.g. "AIzaSy..."
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyCz5-khp8p45VXry13706tdpgq2N92cchg",
+  authDomain: "fulltime-football.firebaseapp.com",
+  projectId: "fulltime-football",
+  storageBucket: "fulltime-football.firebasestorage.app",
+  messagingSenderId: "496305068606",
+  appId: "1:496305068606:web:340bb3a4fcd9ce67254f6f"
 };
 
 // Helper to safely access process.env (prevents crash if process is undefined)
