@@ -31,7 +31,7 @@ import {
   doc
 } from './services/firebase';
 import { User, Entity, Review, League, Match, LeagueMetric, Playlist } from './types';
-import { Loader2, Plus, RefreshCw, Filter, Flame, TrendingUp, AlertCircle, X, ListPlus } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, Filter, Flame, TrendingUp, AlertCircle, X, ListPlus, Users } from 'lucide-react';
 import { getCachedData, setCachedData } from './services/cacheService';
 
 const App: React.FC = () => {
