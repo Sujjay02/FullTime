@@ -165,4 +165,4 @@ const Header: React.FC<HeaderProps> = ({ user, onLogin, onLogout, onSearch, onSe
   );
 };
 
-export default Header;
+export default React.memo(Header);

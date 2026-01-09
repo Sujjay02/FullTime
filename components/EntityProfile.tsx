@@ -298,4 +298,4 @@ const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate, 
   );
 };
 
-export default EntityProfile;
+export default React.memo(EntityProfile);

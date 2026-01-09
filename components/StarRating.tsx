@@ -71,4 +71,4 @@ const StarRating: React.FC<StarRatingProps> = ({
   );
 };
 
-export default StarRating;
+export default React.memo(StarRating);

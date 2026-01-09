@@ -94,4 +94,4 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ entity, onClose, onSubmit }) 
   );
 };
 
-export default ReviewModal;
+export default React.memo(ReviewModal);

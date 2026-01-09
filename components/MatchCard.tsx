@@ -2,6 +2,7 @@ import React from 'react';
 import { Entity, Match } from '../types';
 import StarRating from './StarRating';
 import { Eye, Activity, Goal, CreditCard, Flame } from 'lucide-react';
+import { getScoreBadgeColor, isMustWatch as checkMustWatch } from '../utils/scoreUtils';
 
 interface MatchCardProps {
   match: Entity;
@@ -17,14 +18,7 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, onClick, onLog, hoverEffec
   
   // Watchability logic
   const watchScore = m?.watchability || 0;
-  const isMustWatch = watchScore > 12;
-
-  // Determine color for score
-  const getScoreColor = (score: number) => {
-      if (score > 12) return 'bg-gradient-to-r from-orange-500 to-red-600';
-      if (score > 8) return 'bg-pitch-600';
-      return 'bg-gray-600';
-  };
+  const mustWatch = checkMustWatch(watchScore);
 
   return (
     <div 
@@ -32,8 +26,8 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, onClick, onLog, hoverEffec
       className={`group relative flex flex-col gap-2 cursor-pointer ${hoverEffect ? 'hover:-translate-y-1 transition duration-300' : ''}`}
     >
       {/* Image Container */}
-      <div className={`relative aspect-[16/9] bg-dark-800 rounded-lg overflow-hidden border shadow-md transition group-hover:shadow-pitch-900/20 
-          ${isMustWatch ? 'border-orange-500/50 shadow-orange-900/20' : 'border-dark-700 group-hover:border-pitch-600/50'}`}>
+      <div className={`relative aspect-[16/9] bg-dark-800 rounded-lg overflow-hidden border shadow-md transition group-hover:shadow-pitch-900/20
+          ${mustWatch ? 'border-orange-500/50 shadow-orange-900/20' : 'border-dark-700 group-hover:border-pitch-600/50'}`}>
         <img 
           src={match.image} 
           alt={match.name} 
@@ -55,9 +49,9 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, onClick, onLog, hoverEffec
             
             {/* Watchability Badge */}
             {isMatch && watchScore > 0 && (
-                <div className={`px-2 py-0.5 rounded text-[10px] font-black uppercase text-white shadow-lg flex items-center gap-1 ${getScoreColor(watchScore)}`}>
-                    {isMustWatch ? <Flame size={10} className="text-yellow-200 fill-yellow-200 animate-pulse" /> : <Eye size={10} />}
-                    {isMustWatch ? 'MUST WATCH' : 'Watchability'} <span className="bg-black/20 px-1 rounded ml-1">{watchScore.toFixed(1)}</span>
+                <div className={`px-2 py-0.5 rounded text-[10px] font-black uppercase text-white shadow-lg flex items-center gap-1 ${getScoreBadgeColor(watchScore)}`}>
+                    {mustWatch ? <Flame size={10} className="text-yellow-200 fill-yellow-200 animate-pulse" /> : <Eye size={10} />}
+                    {mustWatch ? 'MUST WATCH' : 'Watchability'} <span className="bg-black/20 px-1 rounded ml-1">{watchScore.toFixed(1)}</span>
                 </div>
             )}
         </div>
@@ -112,4 +106,4 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, onClick, onLog, hoverEffec
   );
 };
 
-export default MatchCard;
+export default React.memo(MatchCard);

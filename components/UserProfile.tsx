@@ -180,4 +180,4 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, reviews, isOwnProfile, 
   );
 };
 
-export default UserProfile;
+export default React.memo(UserProfile);

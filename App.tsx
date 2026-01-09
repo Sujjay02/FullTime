@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import Header from './components/Header';
 import MatchCard from './components/MatchCard';
-import ReviewModal from './components/ReviewModal';
-import EntityProfile from './components/EntityProfile';
-import UserProfile from './components/UserProfile';
-import LeagueDashboard from './components/LeagueDashboard';
+
+const ReviewModal = lazy(() => import('./components/ReviewModal'));
+const EntityProfile = lazy(() => import('./components/EntityProfile'));
+const UserProfile = lazy(() => import('./components/UserProfile'));
+const LeagueDashboard = lazy(() => import('./components/LeagueDashboard'));
 import { INITIAL_LIVE_MATCHES, INITIAL_EXCITING_MATCHES, INITIAL_HIGHEST_SCORING_MATCHES, getGenericImage } from './constants';
 import { 
   searchEntities, 
@@ -31,6 +32,7 @@ import {
 } from './services/firebase';
 import { User, Entity, Review, League, Match, LeagueMetric, Playlist } from './types';
 import { Loader2, Plus, RefreshCw, Filter, Flame, TrendingUp, AlertCircle, X, ListPlus } from 'lucide-react';
+import { getCachedData, setCachedData } from './services/cacheService';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -78,15 +80,29 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  const fetchPlaylists = async (userId: string) => {
-    try {
-      const q = query(collection(db, 'playlists'), where('userId', '==', userId));
-      const snapshot = await getDocs(q);
-      setPlaylists(snapshot.docs.map((d: any) => ({ id: d.id, ...d.data() } as Playlist)));
-    } catch (err) { console.warn(err); }
-  };
+  const fetchPlaylists = useCallback(async (userId: string) => {
+    const cacheKey = `playlists_${userId}`;
+    const cached = getCachedData<Playlist[]>(cacheKey);
 
-  const handleCreatePlaylist = async (name: string) => {
+    if (cached) {
+      setPlaylists(cached);
+      return;
+    }
+
+    try {
+      const q = query(
+        collection(db, 'playlists'),
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      const playlistsData = snapshot.docs.map((d: any) => ({ id: d.id, ...d.data() } as Playlist));
+      setPlaylists(playlistsData);
+      setCachedData(cacheKey, playlistsData, 600); // Cache for 10 minutes
+    } catch (err) { console.warn(err); }
+  }, []);
+
+  const handleCreatePlaylist = useCallback(async (name: string) => {
     if (!user) return;
     const newPlaylist = {
       name,
@@ -96,60 +112,75 @@ const App: React.FC = () => {
       createdAt: new Date().toISOString()
     };
     const docRef = await addDoc(collection(db, 'playlists'), newPlaylist);
-    setPlaylists([...playlists, { id: docRef.id, ...newPlaylist } as Playlist]);
-  };
+    setPlaylists(prev => [...prev, { id: docRef.id, ...newPlaylist } as Playlist]);
+  }, [user]);
 
-  const handleAddToPlaylist = async (playlistId: string, matchId: string) => {
-    const playlist = playlists.find(p => p.id === playlistId);
-    if (!playlist || playlist.matchIds.includes(matchId)) return;
-    
-    const updatedIds = [...playlist.matchIds, matchId];
-    await updateDoc(doc(db, 'playlists', playlistId), { matchIds: updatedIds });
-    setPlaylists(playlists.map(p => p.id === playlistId ? { ...p, matchIds: updatedIds } : p));
+  const handleAddToPlaylist = useCallback(async (playlistId: string, matchId: string) => {
+    setPlaylists(prev => {
+      const playlist = prev.find(p => p.id === playlistId);
+      if (!playlist || playlist.matchIds.includes(matchId)) return prev;
+
+      const updatedIds = [...playlist.matchIds, matchId];
+      updateDoc(doc(db, 'playlists', playlistId), { matchIds: updatedIds });
+      return prev.map(p => p.id === playlistId ? { ...p, matchIds: updatedIds } : p);
+    });
     setIsPlaylistModalOpen(false);
-  };
+  }, []);
 
-  const fetchLive = async () => {
+  const fetchLive = useCallback(async () => {
     setIsRefreshing(true);
     try {
         const liveData = await getLiveMatches(currentLeague || undefined);
         setFeaturedMatches(liveData);
     } catch (err: any) { setFeaturedMatches(INITIAL_LIVE_MATCHES); }
     finally { setIsRefreshing(false); }
-  };
+  }, [currentLeague]);
 
-  const fetchReviews = async (entityId: string) => {
+  const fetchReviews = useCallback(async (entityId: string) => {
+      const cacheKey = `reviews_${entityId}`;
+      const cached = getCachedData<Review[]>(cacheKey);
+
+      if (cached) {
+        setReviews(cached);
+        return;
+      }
+
       try {
           const q = query(collection(db, 'reviews'), where('entityId', '==', entityId), orderBy('createdAt', 'desc'));
           const snapshot = await getDocs(q);
-          setReviews(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Review)));
+          const reviewsData = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Review));
+          setReviews(reviewsData);
+          setCachedData(cacheKey, reviewsData, 300); // Cache for 5 minutes
       } catch (err) { setReviews([]); }
-  };
+  }, []);
 
   useEffect(() => {
     fetchLive();
+  }, [fetchLive]);
+
+  useEffect(() => {
     getExcitingMatches().then(setExcitingMatches);
     getHighestScoringMatches().then(setHighestScoringMatches);
-  }, [currentLeague]);
+  }, []);
 
-  const handleSearch = async (query: string) => {
+  const handleSearch = useCallback(async (query: string) => {
     setIsLoading(true); setView('SEARCH');
     try { setSearchResults(await searchEntities(query)); } catch (err) { setSearchResults([]); }
     finally { setIsLoading(false); }
-  };
+  }, []);
 
-  const handleEntityClick = (entity: Entity) => {
+  const handleEntityClick = useCallback((entity: Entity) => {
     setSelectedEntity(entity); setView('DETAILS');
     window.scrollTo(0, 0); fetchReviews(entity.id);
-  };
+  }, [fetchReviews]);
 
-  const handlePlaylistClick = (matchId: string) => {
+  const handlePlaylistClick = useCallback((matchId: string) => {
     if (!user) { alert("Please login to create playlists."); return; }
     setPlaylistMatchId(matchId);
     setIsPlaylistModalOpen(true);
-  };
+  }, [user]);
 
-  const handleViewLeagues = async () => {
+  const handleViewLeagues = useCallback(async () => {
     setView('LEAGUES');
     if (leagueMetrics.length === 0) {
       setIsLoading(true);
@@ -162,16 +193,44 @@ const App: React.FC = () => {
         setIsLoading(false);
       }
     }
-  };
+  }, [leagueMetrics.length]);
+
+  const handleSelectLeague = useCallback((l: League | null) => {
+    setCurrentLeague(l);
+    setView('HOME');
+  }, []);
+
+  const handleGoHome = useCallback(() => setView('HOME'), []);
+
+  const handleProfileClick = useCallback((u: User) => {
+    setProfileUser(u);
+    setView('PROFILE');
+  }, []);
+
+  const handleOpenReviewModal = useCallback(() => {
+    if (selectedEntity) {
+      setModalEntity(selectedEntity);
+      setIsModalOpen(true);
+    }
+  }, [selectedEntity]);
+
+  const handleCloseReviewModal = useCallback(() => setIsModalOpen(false), []);
+
+  const handleLeagueClick = useCallback((l: League) => {
+    setCurrentLeague(l);
+    setView('HOME');
+  }, []);
 
   return (
     <div className="min-h-screen bg-dark-900 font-sans text-gray-100 relative">
-      <Header 
-         user={user} 
-         onLogin={signInWithGoogle} onLogout={logout} onSearch={handleSearch}
-         onSelectLeague={(l) => { setCurrentLeague(l); setView('HOME'); }}
-         onGoHome={() => setView('HOME')}
-         onProfileClick={(u) => { setProfileUser(u); setView('PROFILE'); }}
+      <Header
+         user={user}
+         onLogin={signInWithGoogle}
+         onLogout={logout}
+         onSearch={handleSearch}
+         onSelectLeague={handleSelectLeague}
+         onGoHome={handleGoHome}
+         onProfileClick={handleProfileClick}
          onViewLeagues={handleViewLeagues}
       />
       
@@ -211,32 +270,52 @@ const App: React.FC = () => {
          )}
 
          {view === 'SEARCH' && (
-           <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-              {searchResults.map(e => (
-                <div key={e.id} onClick={() => handleEntityClick(e)} className="cursor-pointer group bg-dark-800 rounded p-2 border border-dark-700 hover:border-pitch-500 transition">
-                   <div className="aspect-[3/4] rounded overflow-hidden mb-2"><img src={e.image} className="w-full h-full object-cover"/></div>
-                   <div className="text-sm font-bold text-white truncate">{e.name}</div>
-                   <div className="text-[10px] text-gray-500 uppercase">{e.type}</div>
-                </div>
-              ))}
-           </div>
+           <>
+             {isLoading ? (
+               <div className="flex flex-col items-center justify-center py-20">
+                 <Loader2 className="animate-spin text-pitch-500 mb-4" size={48} />
+                 <p className="text-gray-400 text-sm">Searching...</p>
+               </div>
+             ) : searchResults.length > 0 ? (
+               <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+                 {searchResults.map(e => (
+                   <div key={e.id} onClick={() => handleEntityClick(e)} className="cursor-pointer group bg-dark-800 rounded p-2 border border-dark-700 hover:border-pitch-500 transition">
+                     <div className="aspect-[3/4] rounded overflow-hidden mb-2"><img src={e.image} className="w-full h-full object-cover"/></div>
+                     <div className="text-sm font-bold text-white truncate">{e.name}</div>
+                     <div className="text-[10px] text-gray-500 uppercase">{e.type}</div>
+                   </div>
+                 ))}
+               </div>
+             ) : (
+               <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+                 <AlertCircle size={48} className="mb-4" />
+                 <p>No results found. Try a different search.</p>
+               </div>
+             )}
+           </>
          )}
 
          {view === 'DETAILS' && selectedEntity && (
-           <EntityProfile 
-              entity={selectedEntity} 
-              reviews={reviews} 
-              onRate={() => { setModalEntity(selectedEntity); setIsModalOpen(true); }} 
-              onAddToPlaylist={handlePlaylistClick}
-           />
+           <Suspense fallback={<div className="flex justify-center items-center py-20"><Loader2 className="animate-spin text-pitch-500" size={40} /></div>}>
+             <EntityProfile
+                entity={selectedEntity}
+                reviews={reviews}
+                onRate={handleOpenReviewModal}
+                onAddToPlaylist={handlePlaylistClick}
+             />
+           </Suspense>
          )}
 
          {view === 'PROFILE' && profileUser && (
-           <UserProfile user={profileUser} reviews={userReviews} isOwnProfile={user?.id === profileUser.id} onEntityClick={(id) => handleEntityClick({ id, name: '...', type: 'MATCH', image: getGenericImage(id)})} />
+           <Suspense fallback={<div className="flex justify-center items-center py-20"><Loader2 className="animate-spin text-pitch-500" size={40} /></div>}>
+             <UserProfile user={profileUser} reviews={userReviews} isOwnProfile={user?.id === profileUser.id} onEntityClick={(id) => handleEntityClick({ id, name: '...', type: 'MATCH', image: getGenericImage(id)})} />
+           </Suspense>
          )}
 
          {view === 'LEAGUES' && (
-           <LeagueDashboard metrics={leagueMetrics} onLeagueClick={(l) => { setCurrentLeague(l); setView('HOME'); }} onMatchClick={handleEntityClick} isLoading={isLoading} />
+           <Suspense fallback={<div className="flex justify-center items-center py-20"><Loader2 className="animate-spin text-pitch-500" size={40} /></div>}>
+             <LeagueDashboard metrics={leagueMetrics} onLeagueClick={handleLeagueClick} onMatchClick={handleEntityClick} isLoading={isLoading} />
+           </Suspense>
          )}
       </main>
 
@@ -270,7 +349,11 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {isModalOpen && modalEntity && <ReviewModal entity={modalEntity} onClose={() => setIsModalOpen(false)} onSubmit={() => {}} />}
+      {isModalOpen && modalEntity && (
+        <Suspense fallback={null}>
+          <ReviewModal entity={modalEntity} onClose={handleCloseReviewModal} onSubmit={() => {}} />
+        </Suspense>
+      )}
     </div>
   );
 };

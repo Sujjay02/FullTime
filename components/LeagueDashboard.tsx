@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { LeagueMetric, League, Match } from '../types';
 import { Search, TrendingUp, Trophy, ArrowRight, Activity, Flame } from 'lucide-react';
 import MatchCard from './MatchCard';
+import { getScoreTextColor, getProgressBarColor } from '../utils/scoreUtils';
 
 interface LeagueDashboardProps {
   metrics: LeagueMetric[];
@@ -19,19 +20,6 @@ const LeagueDashboard: React.FC<LeagueDashboardProps> = ({ metrics, onLeagueClic
       .filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()))
       .sort((a, b) => b.avgWatchability - a.avgWatchability);
   }, [metrics, searchTerm]);
-
-  // Determine color for score
-  const getScoreColor = (score: number) => {
-      if (score > 10) return 'text-pitch-400';
-      if (score > 6) return 'text-yellow-400';
-      return 'text-gray-400';
-  };
-  
-  const getProgressBarColor = (score: number) => {
-    if (score > 10) return 'bg-pitch-500';
-    if (score > 6) return 'bg-yellow-500';
-    return 'bg-gray-600';
-  };
 
   return (
     <div className="space-y-8 min-h-[60vh] animate-in fade-in duration-500">
@@ -92,7 +80,7 @@ const LeagueDashboard: React.FC<LeagueDashboardProps> = ({ metrics, onLeagueClic
                          <div className="mt-6">
                             <div className="flex justify-between items-end mb-1">
                                <span className="text-xs font-bold text-gray-400 uppercase">Watchability Score</span>
-                               <span className={`text-3xl font-black font-mono ${getScoreColor(metric.avgWatchability)}`}>
+                               <span className={`text-3xl font-black font-mono ${getScoreTextColor(metric.avgWatchability)}`}>
                                  {metric.avgWatchability.toFixed(1)}
                                </span>
                             </div>
@@ -147,4 +135,4 @@ const LeagueDashboard: React.FC<LeagueDashboardProps> = ({ metrics, onLeagueClic
   );
 };
 
-export default LeagueDashboard;
+export default React.memo(LeagueDashboard);
