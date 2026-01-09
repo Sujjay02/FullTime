@@ -5,7 +5,11 @@ import { getCachedData, setCachedData } from "./cacheService";
 import { INITIAL_LIVE_MATCHES, INITIAL_EXCITING_MATCHES, INITIAL_HIGHEST_SCORING_MATCHES, getGenericImage } from "../constants";
 
 // Initialize Gemini API client directly with process.env.API_KEY following strict guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  console.error('⚠️ No Gemini API key found! Set GEMINI_API_KEY in your environment.');
+}
+const ai = new GoogleGenAI({ apiKey: apiKey || '' });
 const modelName = "gemini-3-flash-preview";
 
 const normalizeLeague = (input: string): string => {
@@ -22,7 +26,19 @@ const normalizeLeague = (input: string): string => {
 };
 
 const handleApiError = (error: any, context: string, fallback: any) => {
-  console.warn(`Gemini Error (${context}):`, error);
+  console.error(`❌ Gemini API Error (${context}):`, error);
+
+  if (error?.message?.includes('403')) {
+    console.error('🔑 API Key Issue: Your Gemini API key is forbidden. Check:');
+    console.error('   1. Go to https://aistudio.google.com/apikey');
+    console.error('   2. Add fulltime-football.web.app to allowed domains');
+    console.error('   3. Or generate a new unrestricted API key');
+  } else if (error?.message?.includes('401')) {
+    console.error('🔑 API Key Invalid: Generate a new key at https://aistudio.google.com/apikey');
+  } else if (error?.message?.includes('429')) {
+    console.error('⏰ Rate Limit: Too many requests. Try again in a few minutes.');
+  }
+
   return fallback;
 };
 
@@ -123,13 +139,20 @@ export const getLiveMatches = async (leagueName?: string): Promise<Match[]> => {
   if (!process.env.API_KEY) return INITIAL_LIVE_MATCHES;
 
   try {
-    const now = new Date().toLocaleString('en-US', { timeZone: 'UTC' });
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const dayOfWeek = now.getDay();
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - daysToMonday);
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: `Find live or recent soccer matches for today ${now}. 
-      For each match, provide the ACCURATE Starting XI, Bench, and Events.
-      Include goals/assists season stats. 
-      If no matches are currently live, find the latest completed or upcoming ones for TODAY.`,
+      contents: `Find TOP soccer matches from THIS WEEK (from ${weekStartStr} to ${dateStr}).
+      Focus on MAJOR leagues: Premier League, La Liga, Bundesliga, Serie A, Champions League, Ligue 1.
+      For each match, provide the ACCURATE Starting XI, Bench, and Events with season stats.
+      Return matches from the last 7 days maximum. Do NOT return old matches from months ago.`,
       config: {
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",

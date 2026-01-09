@@ -47,23 +47,27 @@ const Header: React.FC<HeaderProps> = ({ user, onLogin, onLogout, onSearch, onSe
 
           <nav className="hidden md:flex items-center gap-6">
              <button onClick={onGoHome} className="text-gray-300 hover:text-white text-sm font-medium transition">Home</button>
-             
+             <button onClick={onViewLeagues} className="text-gray-300 hover:text-white text-sm font-medium transition flex items-center gap-1.5">
+               <BarChart2 size={16} />
+               Leagues
+             </button>
+
              <div className="relative group">
                <button className="text-gray-300 hover:text-white text-sm font-medium transition flex items-center gap-1">
-                 Leagues
+                 Filter
                </button>
-               {/* Dropdown for leagues */}
+               {/* Dropdown for league filter */}
                <div className="absolute top-full left-0 mt-2 w-56 bg-dark-800 border border-dark-700 rounded shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-1 group-hover:translate-y-0">
                   <div className="py-2">
-                    <button 
-                        onClick={onViewLeagues}
-                        className="w-full text-left px-4 py-2 text-sm text-pitch-400 font-bold hover:text-pitch-300 hover:bg-dark-700 transition flex items-center gap-2"
+                    <button
+                        onClick={() => onSelectLeague(null)}
+                        className="w-full text-left px-4 py-2 text-sm text-pitch-400 font-bold hover:text-pitch-300 hover:bg-dark-700 transition"
                     >
-                        <BarChart2 size={14} /> League Dashboard
+                        All Matches
                     </button>
                     <div className="border-t border-dark-700 my-1"></div>
                     {Object.values(League).map(league => (
-                      <button 
+                      <button
                         key={league}
                         onClick={() => onSelectLeague(league)}
                         className="block w-full text-left px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-dark-700 transition"
@@ -71,13 +75,6 @@ const Header: React.FC<HeaderProps> = ({ user, onLogin, onLogout, onSearch, onSe
                         {league}
                       </button>
                     ))}
-                    <div className="border-t border-dark-700 my-1"></div>
-                     <button 
-                        onClick={() => onSelectLeague(null)}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-dark-700 transition"
-                      >
-                        All Matches
-                      </button>
                   </div>
                </div>
              </div>

@@ -2,14 +2,14 @@
 import { Match, League } from './types';
 
 export const GENERIC_IMAGES = [
-  'https://images.unsplash.com/photo-1522770179533-24471fcdba45?q=80&w=1000&auto=format&fit=crop', // Pitch
-  'https://images.unsplash.com/photo-1517466787929-bc90951d0974?q=80&w=1000&auto=format&fit=crop', // Ball
-  'https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?q=80&w=1000&auto=format&fit=crop', // Stadium
-  'https://images.unsplash.com/photo-1579952363873-27f3bde9be2b?q=80&w=1000&auto=format&fit=crop', // Action
-  'https://images.unsplash.com/photo-1556056504-5c7696c4c28d?q=80&w=1000&auto=format&fit=crop', // Detail
-  'https://images.unsplash.com/photo-1518605348435-26a9787ac60c?q=80&w=1000&auto=format&fit=crop', // Atmosphere
-  'https://images.unsplash.com/photo-1551958219-acbc608c6377?q=80&w=1000&auto=format&fit=crop', // Goal
-  'https://images.unsplash.com/photo-1624880357913-a8539238245b?q=80&w=1000&auto=format&fit=crop'  // Seats
+  'https://images.unsplash.com/photo-1522778119026-d647f0596c20?w=800&auto=format&fit=crop', // Soccer field
+  'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop', // Stadium
+  'https://images.unsplash.com/photo-1589487391730-58f20eb2c308?w=800&auto=format&fit=crop', // Ball
+  'https://images.unsplash.com/photo-1560272564-c83b66b1ad12?w=800&auto=format&fit=crop', // Goal net
+  'https://images.unsplash.com/photo-1606925797300-0b35e9d1794e?w=800&auto=format&fit=crop', // Match action
+  'https://images.unsplash.com/photo-1577223625816-7546f98b3008?w=800&auto=format&fit=crop', // Crowd
+  'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=800&auto=format&fit=crop', // Stadium lights
+  'https://images.unsplash.com/photo-1579952363873-27f3bde9be2b?w=800&auto=format&fit=crop'  // Players
 ];
 
 /**
