@@ -154,8 +154,16 @@ const App: React.FC = () => {
       } catch (err) { setReviews([]); }
   }, []);
 
+  // Auto-refresh live matches every 30 seconds
   useEffect(() => {
     fetchLive();
+
+    const interval = setInterval(() => {
+      console.log('Auto-refreshing live matches...');
+      fetchLive();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
   }, [fetchLive]);
 
   useEffect(() => {
@@ -237,9 +245,67 @@ const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 py-8">
          {view === 'HOME' && (
            <div className="space-y-12">
+              {/* Hero/Signup Section */}
+              {!user && (
+                <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-pitch-900 via-pitch-800 to-dark-900 border border-pitch-700/50 p-8 md:p-12 mb-16 shadow-2xl">
+                  <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/60-lines.png')] opacity-10"></div>
+                  <div className="absolute top-0 right-0 w-96 h-96 bg-pitch-600 rounded-full blur-3xl opacity-20 animate-pulse"></div>
+
+                  <div className="relative z-10 max-w-3xl">
+                    <div className="inline-block px-3 py-1 bg-pitch-600/30 border border-pitch-500/50 rounded-full text-xs font-bold text-pitch-300 uppercase tracking-wider mb-4">
+                      Live Match Data • AI-Powered Insights
+                    </div>
+
+                    <h1 className="text-4xl md:text-6xl font-black text-white mb-4 leading-tight">
+                      Never Miss a <span className="text-pitch-400">Legendary</span> Match Again
+                    </h1>
+
+                    <p className="text-lg md:text-xl text-gray-300 mb-8 leading-relaxed">
+                      Get real-time match updates, AI-powered watchability scores, and personalized recommendations.
+                      Join the community and discover which matches are truly worth your time.
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <button
+                        onClick={signInWithGoogle}
+                        className="bg-pitch-600 hover:bg-pitch-500 text-white font-bold py-4 px-8 rounded-lg transition shadow-lg shadow-pitch-900/40 flex items-center justify-center gap-2 text-lg"
+                      >
+                        <Users size={20} />
+                        Sign Up with Google
+                      </button>
+                      <button
+                        onClick={() => window.scrollTo({ top: 500, behavior: 'smooth' })}
+                        className="bg-dark-800 hover:bg-dark-700 border border-dark-600 text-white font-bold py-4 px-8 rounded-lg transition flex items-center justify-center gap-2 text-lg"
+                      >
+                        <TrendingUp size={20} />
+                        Explore Matches
+                      </button>
+                    </div>
+
+                    <div className="mt-8 grid grid-cols-3 gap-6 pt-6 border-t border-white/10">
+                      <div>
+                        <div className="text-3xl font-black text-pitch-400 mb-1">Live</div>
+                        <div className="text-xs text-gray-400 uppercase tracking-wider">Updates</div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-black text-pitch-400 mb-1">AI</div>
+                        <div className="text-xs text-gray-400 uppercase tracking-wider">Powered</div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-black text-pitch-400 mb-1">Free</div>
+                        <div className="text-xs text-gray-400 uppercase tracking-wider">Forever</div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              )}
+
               <section>
                 <div className="flex justify-between items-center mb-6 border-l-4 border-pitch-500 pl-4">
-                  <h2 className="text-xl font-bold text-white uppercase tracking-widest">Happening Now</h2>
+                  <h2 className="text-xl font-bold text-white uppercase tracking-widest">
+                    Happening Now
+                    {isRefreshing && <span className="ml-2 text-xs text-pitch-400 animate-pulse">• Live</span>}
+                  </h2>
                   <button onClick={fetchLive} className="text-xs text-gray-500 hover:text-pitch-400 flex items-center gap-1">
                     <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} /> Refresh
                   </button>

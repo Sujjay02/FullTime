@@ -145,6 +145,12 @@ export const getLiveMatches = async (leagueName?: string): Promise<Match[]> => {
       const { home, away } = extractTeams(item);
       const id = `match_${home}_${away}`.replace(/\s/g, '').toLowerCase();
       const leagueStr = normalizeLeague(item.league);
+
+      // Debug logging for lineups
+      console.log(`Match: ${home} vs ${away}`);
+      console.log('Home lineup:', item.lineupHome?.length || 0, 'players');
+      console.log('Away lineup:', item.lineupAway?.length || 0, 'players');
+
       return {
         id,
         name: `${home} vs ${away}`,
