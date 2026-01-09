@@ -37,7 +37,7 @@ export const INITIAL_LIVE_MATCHES: Match[] = [
     score: '2 - 2',
     minute: "88'",
     league: League.PREMIER_LEAGUE,
-    image: getGenericImage('m1'), 
+    image: getGenericImage('m1'),
     rating: 4.8,
     subtitle: 'Premier League • Etihad Stadium',
     status: 'LIVE',

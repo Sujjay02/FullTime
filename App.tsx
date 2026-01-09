@@ -2,23 +2,28 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import Header from './components/Header';
 import MatchCard from './components/MatchCard';
+import Toast from './components/Toast';
+import { useToast } from './hooks/useToast';
 
 const ReviewModal = lazy(() => import('./components/ReviewModal'));
 const EntityProfile = lazy(() => import('./components/EntityProfile'));
 const UserProfile = lazy(() => import('./components/UserProfile'));
 const LeagueDashboard = lazy(() => import('./components/LeagueDashboard'));
+const About = lazy(() => import('./components/About'));
 import { INITIAL_LIVE_MATCHES, INITIAL_EXCITING_MATCHES, INITIAL_HIGHEST_SCORING_MATCHES, getGenericImage } from './constants';
-import { 
-  searchEntities, 
-  getLiveMatches, 
-  getExcitingMatches, 
+import {
+  searchEntities,
+  getLiveMatches,
+  getExcitingMatches,
   getHighestScoringMatches,
-  getLeagueMetrics 
+  getLeagueMetrics,
+  getExcitingPlayers
 } from './services/footballService';
-import { 
-  auth, 
-  signInWithGoogle, 
-  logout, 
+import { getHybridLiveMatches } from './services/hybridFootballService';
+import {
+  auth,
+  signInWithGoogle,
+  logout,
   db,
   onAuthStateChanged,
   collection,
@@ -35,15 +40,72 @@ import { Loader2, Plus, RefreshCw, Filter, Flame, TrendingUp, AlertCircle, X, Li
 import { getCachedData, setCachedData } from './services/cacheService';
 
 const App: React.FC = () => {
+  const { toasts, removeToast, success, error: showError, info } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [currentLeague, setCurrentLeague] = useState<League | null>(null);
+  const [dateFilter, setDateFilter] = useState<'all' | 'today'>('all');
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'HOME' | 'SEARCH' | 'DETAILS' | 'PROFILE' | 'LEAGUES'>('HOME');
+  const [view, setView] = useState<'HOME' | 'SEARCH' | 'DETAILS' | 'PROFILE' | 'LEAGUES' | 'ABOUT'>('HOME');
+
+  // URL routing - sync view with URL
+  useEffect(() => {
+    const syncViewFromUrl = () => {
+      const path = window.location.pathname;
+      if (path === '/' || path === '/home') {
+        setView('HOME');
+      } else if (path === '/leagues') {
+        setView('LEAGUES');
+      } else if (path === '/about') {
+        setView('ABOUT');
+      } else if (path.startsWith('/profile')) {
+        setView('PROFILE');
+      } else if (path.startsWith('/search')) {
+        setView('SEARCH');
+      } else if (path.startsWith('/match')) {
+        setView('DETAILS');
+      }
+
+      // Extract league from URL params
+      const urlParams = new URLSearchParams(window.location.search);
+      const leagueParam = urlParams.get('league');
+      if (leagueParam && Object.values(League).includes(leagueParam as League)) {
+        setCurrentLeague(leagueParam as League);
+      }
+    };
+
+    syncViewFromUrl();
+
+    // Listen for browser back/forward
+    window.addEventListener('popstate', syncViewFromUrl);
+    return () => window.removeEventListener('popstate', syncViewFromUrl);
+  }, []);
+
+  // Update URL when view changes
+  const updateUrl = useCallback((newView: typeof view, params?: Record<string, string>) => {
+    const urlMap = {
+      'HOME': '/',
+      'LEAGUES': '/leagues',
+      'ABOUT': '/about',
+      'PROFILE': '/profile',
+      'SEARCH': '/search',
+      'DETAILS': '/match'
+    };
+
+    let url = urlMap[newView] || '/';
+
+    if (params) {
+      const searchParams = new URLSearchParams(params);
+      url += '?' + searchParams.toString();
+    }
+
+    window.history.pushState({}, '', url);
+  }, []);
   
   const [featuredMatches, setFeaturedMatches] = useState<Match[]>(INITIAL_LIVE_MATCHES);
   const [excitingMatches, setExcitingMatches] = useState<Match[]>(INITIAL_EXCITING_MATCHES);
   const [highestScoringMatches, setHighestScoringMatches] = useState<Match[]>(INITIAL_HIGHEST_SCORING_MATCHES);
-  
+  const [excitingPlayers, setExcitingPlayers] = useState<Entity[]>([]);
+
   const [searchResults, setSearchResults] = useState<Entity[]>([]);
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -123,33 +185,72 @@ const App: React.FC = () => {
       setCachedData(cacheKey, [...playlists, playlist], 600);
 
       setIsPlaylistModalOpen(false);
-      alert(`List "${name}" created successfully!`);
+      success(`Playlist "${name}" created successfully!`);
     } catch (error: any) {
       console.error('Failed to create playlist:', error);
-      alert(`Failed to create list: ${error.message}. Make sure you're logged in and Firestore is enabled.`);
+      showError(`Failed to create playlist: ${error.message}`);
     }
-  }, [user, playlists]);
+  }, [user, playlists, success, showError]);
 
   const handleAddToPlaylist = useCallback(async (playlistId: string, matchId: string) => {
-    setPlaylists(prev => {
-      const playlist = prev.find(p => p.id === playlistId);
-      if (!playlist || playlist.matchIds.includes(matchId)) return prev;
+    try {
+      const playlist = playlists.find(p => p.id === playlistId);
+      if (!playlist) {
+        showError('Playlist not found');
+        return;
+      }
+
+      if (playlist.matchIds.includes(matchId)) {
+        info('Match already in playlist');
+        return;
+      }
 
       const updatedIds = [...playlist.matchIds, matchId];
-      updateDoc(doc(db, 'playlists', playlistId), { matchIds: updatedIds });
-      return prev.map(p => p.id === playlistId ? { ...p, matchIds: updatedIds } : p);
-    });
-    setIsPlaylistModalOpen(false);
-  }, []);
+      await updateDoc(doc(db, 'playlists', playlistId), { matchIds: updatedIds });
 
-  const fetchLive = useCallback(async () => {
+      setPlaylists(prev => prev.map(p => p.id === playlistId ? { ...p, matchIds: updatedIds } : p));
+      setIsPlaylistModalOpen(false);
+      success('Match added to playlist!');
+    } catch (error: any) {
+      console.error('Failed to add to playlist:', error);
+      showError(`Failed to add match: ${error.message}`);
+    }
+  }, [playlists, success, showError, info]);
+
+  const fetchLive = useCallback(async (forceRefresh: boolean = false) => {
     setIsRefreshing(true);
     try {
-        const liveData = await getLiveMatches(currentLeague || undefined);
+        // If forcing refresh, clear cache first
+        if (forceRefresh) {
+          const cacheKey = `live_v2_${currentLeague || 'all'}`;
+          const hybridCacheKey = `hybrid_live_${new Date().toISOString().split('T')[0]}_${currentLeague || 'all'}`;
+          localStorage.removeItem(cacheKey);
+          localStorage.removeItem(hybridCacheKey);
+        }
+
+        // Try hybrid mode first (real API + AI analysis)
+        // If Football Data API key is not set or fails, falls back to AI-only mode
+        let liveData = await getHybridLiveMatches(currentLeague || undefined);
+
+        // If hybrid returns no data, fall back to AI-only mode
+        if (liveData.length === 0) {
+          console.log('🔄 Hybrid mode returned no data, falling back to AI-only mode');
+          liveData = await getLiveMatches(currentLeague || undefined);
+        }
+
         setFeaturedMatches(liveData);
-    } catch (err: any) { setFeaturedMatches(INITIAL_LIVE_MATCHES); }
+
+        if (forceRefresh) {
+          success('Matches refreshed!');
+        }
+    } catch (err: any) {
+      setFeaturedMatches(INITIAL_LIVE_MATCHES);
+      if (forceRefresh) {
+        showError('Failed to refresh matches');
+      }
+    }
     finally { setIsRefreshing(false); }
-  }, [currentLeague]);
+  }, [currentLeague, success, showError]);
 
   const fetchReviews = useCallback(async (entityId: string) => {
       const cacheKey = `reviews_${entityId}`;
@@ -169,22 +270,33 @@ const App: React.FC = () => {
       } catch (err) { setReviews([]); }
   }, []);
 
-  // Auto-refresh live matches every 10 minutes (respects 30-min cache)
+  // Progressive data loading - load in stages for faster initial render
   useEffect(() => {
-    fetchLive();
+    // Stage 1: Load cached live matches immediately
+    fetchLive(false);
 
+    // Stage 2: Load other matches progressively
+    setTimeout(() => {
+      getExcitingMatches().then(setExcitingMatches);
+    }, 100);
+
+    setTimeout(() => {
+      getHighestScoringMatches().then(setHighestScoringMatches);
+    }, 200);
+
+    // Stage 3: Load exciting players
+    setTimeout(() => {
+      getExcitingPlayers().then(setExcitingPlayers);
+    }, 300);
+
+    // Stage 4: Auto-refresh in background every 5 minutes (reduced from 10)
     const interval = setInterval(() => {
-      console.log('Auto-refreshing live matches...');
-      fetchLive();
-    }, 600000); // 10 minutes
+      console.log('🔄 Auto-refreshing matches in background...');
+      fetchLive(false); // Don't show toast for auto-refresh
+    }, 300000); // 5 minutes
 
     return () => clearInterval(interval);
-  }, [fetchLive]);
-
-  useEffect(() => {
-    getExcitingMatches().then(setExcitingMatches);
-    getHighestScoringMatches().then(setHighestScoringMatches);
-  }, []);
+  }, [currentLeague]); // Re-fetch when league changes
 
   const handleSearch = useCallback(async (query: string) => {
     setIsLoading(true); setView('SEARCH');
@@ -205,6 +317,7 @@ const App: React.FC = () => {
 
   const handleViewLeagues = useCallback(async () => {
     setView('LEAGUES');
+    updateUrl('LEAGUES');
     if (leagueMetrics.length === 0) {
       setIsLoading(true);
       try {
@@ -216,19 +329,31 @@ const App: React.FC = () => {
         setIsLoading(false);
       }
     }
-  }, [leagueMetrics.length]);
+  }, [leagueMetrics.length, updateUrl]);
 
   const handleSelectLeague = useCallback((l: League | null) => {
     setCurrentLeague(l);
     setView('HOME');
-  }, []);
+    const params = l ? { league: l } : {};
+    updateUrl('HOME', params);
+  }, [updateUrl]);
 
-  const handleGoHome = useCallback(() => setView('HOME'), []);
+  const handleGoHome = useCallback(() => {
+    setView('HOME');
+    setCurrentLeague(null);
+    updateUrl('HOME');
+  }, [updateUrl]);
 
   const handleProfileClick = useCallback((u: User) => {
     setProfileUser(u);
     setView('PROFILE');
-  }, []);
+    updateUrl('PROFILE', { user: u.id });
+  }, [updateUrl]);
+
+  const handleViewAbout = useCallback(() => {
+    setView('ABOUT');
+    updateUrl('ABOUT');
+  }, [updateUrl]);
 
   const handleOpenReviewModal = useCallback(() => {
     if (selectedEntity) {
@@ -241,7 +366,7 @@ const App: React.FC = () => {
 
   const handleSubmitReview = useCallback(async (rating: number, comment: string) => {
     if (!user || !modalEntity) {
-      alert("Please login to submit a review.");
+      showError("Please login to submit a review.");
       return;
     }
 
@@ -267,18 +392,52 @@ const App: React.FC = () => {
       // Add to reviews state
       setReviews(prev => [{ id: docRef.id, ...review }, ...prev]);
 
-      alert("Review submitted successfully!");
+      success("Review submitted successfully!");
       setIsModalOpen(false);
     } catch (error: any) {
       console.error('Failed to submit review:', error);
-      alert(`Failed to submit review: ${error.message}. Make sure Firestore is enabled.`);
+      showError(`Failed to submit review: ${error.message}`);
     }
-  }, [user, modalEntity]);
+  }, [user, modalEntity, success, showError]);
 
   const handleLeagueClick = useCallback((l: League) => {
     setCurrentLeague(l);
     setView('HOME');
-  }, []);
+    updateUrl('HOME', { league: l });
+  }, [updateUrl]);
+
+  // Filter matches by league and date
+  const filteredFeaturedMatches = useMemo(() => {
+    let matches = featuredMatches;
+
+    // Filter by league
+    if (currentLeague) {
+      matches = matches.filter(m => m.league === currentLeague);
+    }
+
+    // Filter by date
+    if (dateFilter === 'today') {
+      const today = new Date().toISOString().split('T')[0];
+      matches = matches.filter(m => {
+        // Assuming matches have a date field or we can extract from the match data
+        return true; // For now, keep all matches
+      });
+    }
+
+    return matches;
+  }, [featuredMatches, currentLeague, dateFilter]);
+
+  const filteredExcitingMatches = useMemo(() => {
+    return currentLeague
+      ? excitingMatches.filter(m => m.league === currentLeague)
+      : excitingMatches;
+  }, [excitingMatches, currentLeague]);
+
+  const filteredHighestScoringMatches = useMemo(() => {
+    return currentLeague
+      ? highestScoringMatches.filter(m => m.league === currentLeague)
+      : highestScoringMatches;
+  }, [highestScoringMatches, currentLeague]);
 
   return (
     <div className="min-h-screen bg-dark-900 font-sans text-gray-100 relative">
@@ -291,6 +450,7 @@ const App: React.FC = () => {
          onGoHome={handleGoHome}
          onProfileClick={handleProfileClick}
          onViewLeagues={handleViewLeagues}
+         onViewAbout={handleViewAbout}
       />
       
       <main className="max-w-7xl mx-auto px-4 py-8">
@@ -357,12 +517,17 @@ const App: React.FC = () => {
                     Happening Now
                     {isRefreshing && <span className="ml-2 text-xs text-pitch-400 animate-pulse">• Live</span>}
                   </h2>
-                  <button onClick={fetchLive} className="text-xs text-gray-500 hover:text-pitch-400 flex items-center gap-1">
-                    <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} /> Refresh
+                  <button
+                    onClick={() => fetchLive(true)}
+                    disabled={isRefreshing}
+                    className="text-xs text-gray-500 hover:text-pitch-400 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  >
+                    <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
+                    {isRefreshing ? 'Refreshing...' : 'Refresh'}
                   </button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                   {featuredMatches.map(m => (
+                   {filteredFeaturedMatches.length > 0 ? filteredFeaturedMatches.map(m => (
                      <div key={m.id} className="relative group">
                         <MatchCard match={m} onClick={() => handleEntityClick(m)} />
                         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition z-10">
@@ -370,19 +535,64 @@ const App: React.FC = () => {
                            <button onClick={(e) => { e.stopPropagation(); handlePlaylistClick(m.id); }} className="p-1.5 bg-black/60 rounded-full text-white hover:bg-blue-600"><ListPlus size={14}/></button>
                         </div>
                      </div>
-                   ))}
+                   )) : (
+                     <div className="col-span-full text-center py-12 text-gray-500">
+                       No matches found for {currentLeague}. Try selecting a different league.
+                     </div>
+                   )}
                 </div>
               </section>
-              
+
               <section>
                  <div className="flex items-center gap-2 mb-6 border-l-4 border-orange-500 pl-4">
                    <h2 className="text-xl font-bold text-white uppercase tracking-widest">Weekly Highlights</h2>
                    <Flame size={18} className="text-orange-500" />
                  </div>
                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {excitingMatches.map(m => <MatchCard key={m.id} match={m} onClick={() => handleEntityClick(m)} />)}
+                    {filteredExcitingMatches.length > 0 ? filteredExcitingMatches.map(m => <MatchCard key={m.id} match={m} onClick={() => handleEntityClick(m)} />) : (
+                      <div className="col-span-full text-center py-12 text-gray-500">
+                        No exciting matches found for {currentLeague}.
+                      </div>
+                    )}
                  </div>
               </section>
+
+              {excitingPlayers.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-6 border-l-4 border-yellow-500 pl-4">
+                    <h2 className="text-xl font-bold text-white uppercase tracking-widest">Exciting Players to Watch</h2>
+                    <Users size={18} className="text-yellow-500" />
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+                    {excitingPlayers.map(player => (
+                      <div
+                        key={player.id}
+                        onClick={() => handleEntityClick(player)}
+                        className="cursor-pointer group bg-dark-800 rounded-lg p-4 border border-dark-700 hover:border-yellow-500 transition"
+                      >
+                        <div className="aspect-square rounded-full overflow-hidden mb-3 bg-dark-700">
+                          <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm font-bold text-white truncate mb-1">{player.name}</div>
+                          <div className="text-xs text-gray-400 truncate mb-2">{player.subtitle}</div>
+                          {typeof player.stats === 'object' && 'goals' in player.stats && (
+                            <div className="flex justify-center gap-3 text-xs">
+                              <div className="text-pitch-400 font-bold">{player.stats.goals}G</div>
+                              <div className="text-blue-400 font-bold">{player.stats.assists}A</div>
+                            </div>
+                          )}
+                          {player.rating && (
+                            <div className="mt-2 px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/50 rounded text-xs font-bold text-yellow-300 inline-block">
+                              {player.rating.toFixed(1)} ⭐
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
            </div>
          )}
 
@@ -425,13 +635,34 @@ const App: React.FC = () => {
 
          {view === 'PROFILE' && profileUser && (
            <Suspense fallback={<div className="flex justify-center items-center py-20"><Loader2 className="animate-spin text-pitch-500" size={40} /></div>}>
-             <UserProfile user={profileUser} reviews={userReviews} isOwnProfile={user?.id === profileUser.id} onEntityClick={(id) => handleEntityClick({ id, name: '...', type: 'MATCH', image: getGenericImage(id)})} />
+             <UserProfile
+               user={profileUser}
+               reviews={userReviews}
+               playlists={playlists.filter((p: Playlist) => p.userId === profileUser.id)}
+               matches={[...featuredMatches, ...excitingMatches, ...highestScoringMatches]}
+               isOwnProfile={user?.id === profileUser.id}
+               onEntityClick={(id: string) => handleEntityClick({ id, name: '...', type: 'MATCH', image: getGenericImage(id)})}
+               onMatchClick={(id: string) => {
+                 // Find the full match object from state
+                 const allMatches = [...featuredMatches, ...excitingMatches, ...highestScoringMatches];
+                 const match = allMatches.find(m => m.id === id);
+                 if (match) {
+                   handleEntityClick(match);
+                 }
+               }}
+             />
            </Suspense>
          )}
 
          {view === 'LEAGUES' && (
            <Suspense fallback={<div className="flex justify-center items-center py-20"><Loader2 className="animate-spin text-pitch-500" size={40} /></div>}>
              <LeagueDashboard metrics={leagueMetrics} onLeagueClick={handleLeagueClick} onMatchClick={handleEntityClick} isLoading={isLoading} />
+           </Suspense>
+         )}
+
+         {view === 'ABOUT' && (
+           <Suspense fallback={<div className="flex justify-center items-center py-20"><Loader2 className="animate-spin text-pitch-500" size={40} /></div>}>
+             <About />
            </Suspense>
          )}
       </main>
@@ -471,6 +702,16 @@ const App: React.FC = () => {
           <ReviewModal entity={modalEntity} onClose={handleCloseReviewModal} onSubmit={handleSubmitReview} />
         </Suspense>
       )}
+
+      {/* Toast Notifications */}
+      {toasts.map(toast => (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          onClose={() => removeToast(toast.id)}
+        />
+      ))}
     </div>
   );
 };

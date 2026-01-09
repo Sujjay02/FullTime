@@ -80,7 +80,8 @@ const LINEUP_SCHEMA = {
           number: { type: Type.NUMBER },
           position: { type: Type.STRING },
           goals: { type: Type.NUMBER, description: "Total goals this season" },
-          assists: { type: Type.NUMBER, description: "Total assists this season" }
+          assists: { type: Type.NUMBER, description: "Total assists this season" },
+          watchability: { type: Type.NUMBER, description: "Player excitement rating 0-10 based on form, skills, impact" }
         }
       }
     },
@@ -93,7 +94,8 @@ const LINEUP_SCHEMA = {
           number: { type: Type.NUMBER },
           position: { type: Type.STRING },
           goals: { type: Type.NUMBER, description: "Total goals this season" },
-          assists: { type: Type.NUMBER, description: "Total assists this season" }
+          assists: { type: Type.NUMBER, description: "Total assists this season" },
+          watchability: { type: Type.NUMBER, description: "Player excitement rating 0-10 based on form, skills, impact" }
         }
       }
     },
@@ -106,7 +108,8 @@ const LINEUP_SCHEMA = {
           number: { type: Type.NUMBER },
           position: { type: Type.STRING },
           goals: { type: Type.NUMBER },
-          assists: { type: Type.NUMBER }
+          assists: { type: Type.NUMBER },
+          watchability: { type: Type.NUMBER, description: "Player excitement rating 0-10" }
         }
       }
     },
@@ -119,7 +122,8 @@ const LINEUP_SCHEMA = {
           number: { type: Type.NUMBER },
           position: { type: Type.STRING },
           goals: { type: Type.NUMBER },
-          assists: { type: Type.NUMBER }
+          assists: { type: Type.NUMBER },
+          watchability: { type: Type.NUMBER, description: "Player excitement rating 0-10" }
         }
       }
     },
@@ -150,7 +154,11 @@ const extractTeams = (item: any) => {
 };
 
 export const getLiveMatches = async (leagueName?: string): Promise<Match[]> => {
-  const cacheKey = `live_v2_${leagueName || 'all'}`;
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+
+  // Use date in cache key to auto-expire at day change
+  const cacheKey = `live_${dateStr}_${leagueName || 'all'}`;
   const cached = getCachedData<Match[]>(cacheKey);
   if (cached) {
     console.log(`✅ Cache hit: ${cacheKey}`);
@@ -158,21 +166,35 @@ export const getLiveMatches = async (leagueName?: string): Promise<Match[]> => {
   }
   if (!process.env.API_KEY) return INITIAL_LIVE_MATCHES;
 
-  const dedupKey = `live_${leagueName || 'all'}`;
+  const dedupKey = `live_${dateStr}_${leagueName || 'all'}`;
   return dedupedApiCall(dedupKey, async () => {
     try {
-      const now = new Date();
-      const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
-      const dayOfWeek = now.getDay();
-      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - daysToMonday);
-      const weekStartStr = weekStart.toISOString().split('T')[0];
-
-      console.log(`🚀 API call: ${dedupKey} | Date range: ${weekStartStr} to ${dateStr}`);
+      console.log(`🚀 Fetching TODAY'S matches: ${dateStr}`);
       const response = await ai.models.generateContent({
       model: modelName,
-      contents: `Find EXACTLY 4 matches between ${weekStartStr} and ${dateStr} (THIS WEEK ONLY). NO old matches. For EACH match, use ACTUAL lineups from THAT SPECIFIC DATE. Major leagues only. Include: match date, lineups (11 starters + bench), formations, events, stats.`,
+      contents: `CRITICAL: Use Google Search to find REAL football matches happening on ${dateStr}.
+
+SEARCH QUERY REQUIREMENTS:
+- Search: "football matches today ${dateStr} ${leagueName || 'Premier League La Liga Bundesliga'}"
+- Use sites: livescore.com, espn.com, bbc.com/sport, flashscore.com
+- Verify ALL data comes from ${dateStr} ONLY
+
+REQUIRED: Find EXACTLY 4 REAL matches from ${dateStr}:
+${leagueName ? `- MUST be from ${leagueName}` : '- From: Premier League, La Liga, Bundesliga, Serie A, or Champions League'}
+- Include LIVE matches first, then FT, then UPCOMING
+- NO fictional data - all teams, scores, times must be VERIFIED real
+
+For EACH match provide:
+1. Confirmed team names (verify spelling from official sources)
+2. REAL current score or "vs" if upcoming
+3. Actual match status (LIVE with minute, HT, FT, or UPCOMING with time)
+4. Verified starting lineups (11 players each with real jersey numbers)
+5. Real formations currently being used
+6. Actual match events with exact times
+7. Player stats (goals/assists this season - VERIFY from transfermarkt or similar)
+8. Player watchability scores (0-10) based on current form and stats
+
+VALIDATE: Cross-reference at least 2 sources before including any data.`,
       config: {
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",
@@ -236,23 +258,60 @@ export const getLiveMatches = async (leagueName?: string): Promise<Match[]> => {
 };
 
 export const getExcitingMatches = async (): Promise<Match[]> => {
-  const cacheKey = 'exciting_v2';
+  const now = new Date();
+  // Get current week number for cache key
+  const weekNumber = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
+  const cacheKey = `exciting_week_${weekNumber}`;
+
   const cached = getCachedData<Match[]>(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    console.log(`✅ Cache hit: ${cacheKey}`);
+    return cached;
+  }
   if (!process.env.API_KEY) return INITIAL_EXCITING_MATCHES;
 
-  return dedupedApiCall('exciting', async () => {
+  const dedupKey = `exciting_week_${weekNumber}`;
+  return dedupedApiCall(dedupKey, async () => {
     try {
-      const now = new Date();
-      const sevenDaysAgo = new Date(now);
-      sevenDaysAgo.setDate(now.getDate() - 7);
-      const startDate = sevenDaysAgo.toISOString().split('T')[0];
+      // Get start of current week (Monday)
+      const startOfWeek = new Date(now);
+      const day = startOfWeek.getDay();
+      const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+      startOfWeek.setDate(diff);
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      const startDate = startOfWeek.toISOString().split('T')[0];
       const endDate = now.toISOString().split('T')[0];
 
-      console.log(`🚀 Exciting matches: ${startDate} to ${endDate}`);
+      console.log(`🚀 Fetching THIS WEEK'S exciting matches: ${startDate} to ${endDate}`);
       const response = await ai.models.generateContent({
         model: modelName,
-        contents: `Find EXACTLY 4 exciting matches between ${startDate} and ${endDate} (last 7 days ONLY). NO old matches. Must have comebacks or late goals. For EACH match, use ACTUAL lineups from THAT SPECIFIC DATE. Include: match date, lineups, formations, events, stats.`,
+        contents: `CRITICAL: Use Google Search to find the MOST EXCITING completed football matches from THIS WEEK (${startDate} to ${endDate}).
+
+SEARCH STRATEGY:
+- Search: "best football matches this week ${startDate} ${endDate} highlights goals"
+- Focus on matches with 4+ goals, comebacks, late winners, or dramatic finishes
+- Use: espn.com, bbc.com/sport, goal.com, whoscored.com
+- ONLY include matches that actually happened between ${startDate} and ${endDate}
+
+REQUIRED: Find EXACTLY 4 REAL exciting matches:
+- Each must have happened THIS WEEK (${startDate} to ${endDate})
+- Must have high entertainment value (comebacks, many goals, close finishes)
+- From major leagues: Premier League, La Liga, Bundesliga, Serie A, Champions League
+- All matches must be FINISHED (FT status)
+
+For EACH match provide:
+1. REAL team names (verify from match reports)
+2. Final score
+3. Exact date the match was played (YYYY-MM-DD format)
+4. Actual starting lineups from that specific match
+5. Real formations used
+6. All goal events with scorer names and exact minutes
+7. Cards and substitutions
+8. Player stats verified from that match
+9. Watchability score 8-10 (these should all be exciting!)
+
+VERIFICATION: Each match must be verified from official match reports or live score sites.`,
       config: {
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",
@@ -423,10 +482,23 @@ export const getLeagueMetrics = async (): Promise<LeagueMetric[]> => {
 
 export const searchEntities = async (query: string): Promise<Entity[]> => {
   if (!process.env.API_KEY || !query) return [];
-  try {
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: `Search: "${query}". If TEAM: include squad (players with stats), formation, league, last 5 matches, next 3 fixtures, avg watchability.`,
+
+  // Check cache first
+  const cacheKey = `search_${query.toLowerCase()}`;
+  const cached = getCachedData<Entity[]>(cacheKey);
+  if (cached) {
+    console.log(`✅ Search cache hit: ${cacheKey}`);
+    return cached;
+  }
+
+  // Dedupe concurrent searches for same query
+  const dedupKey = `search_${query}`;
+  return dedupedApiCall(dedupKey, async () => {
+    try {
+      console.log(`🔍 Searching for: "${query}"`);
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: `Search: "${query}". Return 5-8 results. If TEAM: include squad, formation, league, recent matches, fixtures, avg watchability.`,
       config: {
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",
@@ -472,7 +544,7 @@ export const searchEntities = async (query: string): Promise<Entity[]> => {
       }
     });
     const data = JSON.parse(response.text || "[]");
-    return data.map((item: any, idx: number) => {
+    const results = data.map((item: any, idx: number) => {
       const entity: Entity = {
         id: `s_${idx}_${Date.now()}`,
         name: item.name,
@@ -486,64 +558,171 @@ export const searchEntities = async (query: string): Promise<Entity[]> => {
         squad: item.squad || []
       };
 
-      console.log(`🔍 Team: ${item.name} | Squad: ${entity.squad?.length || 0} players | Formation: ${entity.formation || 'N/A'}`);
+      // Convert recent/upcoming matches...
+      if (item.recentMatches) entity.recentMatches = item.recentMatches.map((m: any, mIdx: number) => ({
+        id: `recent_${entity.id}_${mIdx}`,
+        name: `${extractTeams(m).home} vs ${extractTeams(m).away}`,
+        type: 'MATCH' as const,
+        homeTeam: extractTeams(m).home,
+        awayTeam: extractTeams(m).away,
+        score: m.score || '0-0',
+        minute: m.minute || 'FT',
+        status: (m.status?.toUpperCase() as MatchStatus) || 'FT',
+        league: normalizeLeague(m.league),
+        subtitle: `${normalizeLeague(m.league)} • ${m.minute || 'FT'}`,
+        image: getGenericImage(`recent_${entity.id}_${mIdx}`),
+        watchability: m.watchability || 5.0,
+        formation: { home: m.formationHome || "4-3-3", away: m.formationAway || "4-3-3" },
+        lineups: { home: m.lineupHome || [], away: m.lineupAway || [] },
+        bench: { home: m.benchHome || [], away: m.benchAway || [] },
+        events: m.events || []
+      }));
 
-      // Convert recent matches if team
-      if (item.recentMatches && Array.isArray(item.recentMatches)) {
-        entity.recentMatches = item.recentMatches.map((m: any, mIdx: number) => {
-          const { home, away } = extractTeams(m);
-          const matchId = `recent_${entity.id}_${mIdx}`;
-          return {
-            id: matchId,
-            name: `${home} vs ${away}`,
-            type: 'MATCH' as const,
-            homeTeam: home,
-            awayTeam: away,
-            score: m.score || '0-0',
-            minute: m.minute || 'FT',
-            status: (m.status?.toUpperCase() as MatchStatus) || 'FT',
-            league: normalizeLeague(m.league),
-            subtitle: `${normalizeLeague(m.league)} • ${m.minute || 'FT'}`,
-            image: getGenericImage(matchId),
-            watchability: m.watchability || 5.0,
-            formation: { home: m.formationHome || "4-3-3", away: m.formationAway || "4-3-3" },
-            lineups: { home: m.lineupHome || [], away: m.lineupAway || [] },
-            bench: { home: m.benchHome || [], away: m.benchAway || [] },
-            events: m.events || []
-          };
-        });
-      }
-
-      // Convert upcoming matches if team
-      if (item.upcomingMatches && Array.isArray(item.upcomingMatches)) {
-        entity.upcomingMatches = item.upcomingMatches.map((m: any, mIdx: number) => {
-          const { home, away } = extractTeams(m);
-          const matchId = `upcoming_${entity.id}_${mIdx}`;
-          return {
-            id: matchId,
-            name: `${home} vs ${away}`,
-            type: 'MATCH' as const,
-            homeTeam: home,
-            awayTeam: away,
-            score: m.score || 'vs',
-            minute: m.minute || 'UPCOMING',
-            status: 'UPCOMING' as const,
-            league: normalizeLeague(m.league),
-            subtitle: `${normalizeLeague(m.league)} • ${m.minute || 'Upcoming'}`,
-            image: getGenericImage(matchId),
-            watchability: m.watchability || 7.0,
-            formation: { home: m.formationHome || "4-3-3", away: m.formationAway || "4-3-3" },
-            lineups: { home: m.lineupHome || [], away: m.lineupAway || [] },
-            bench: { home: m.benchHome || [], away: m.benchAway || [] },
-            events: []
-          };
-        });
-      }
+      if (item.upcomingMatches) entity.upcomingMatches = item.upcomingMatches.map((m: any, mIdx: number) => ({
+        id: `upcoming_${entity.id}_${mIdx}`,
+        name: `${extractTeams(m).home} vs ${extractTeams(m).away}`,
+        type: 'MATCH' as const,
+        homeTeam: extractTeams(m).home,
+        awayTeam: extractTeams(m).away,
+        score: m.score || 'vs',
+        minute: m.minute || 'UPCOMING',
+        status: 'UPCOMING' as const,
+        league: normalizeLeague(m.league),
+        subtitle: `${normalizeLeague(m.league)} • Upcoming`,
+        image: getGenericImage(`upcoming_${entity.id}_${mIdx}`),
+        watchability: m.watchability || 7.0,
+        formation: { home: m.formationHome || "4-3-3", away: m.formationAway || "4-3-3" },
+        lineups: { home: m.lineupHome || [], away: m.lineupAway || [] },
+        bench: { home: m.benchHome || [], away: m.benchAway || [] },
+        events: []
+      }));
 
       return entity;
     });
+
+    // Cache search results for 10 minutes
+    setCachedData(cacheKey, results, 600);
+    console.log(`✅ Search complete: ${results.length} results`);
+
+    return results;
   } catch (error) {
-    console.error('Search error:', error);
+    console.error('❌ Search error:', error);
     return [];
   }
+  });
+};
+
+/**
+ * Get most exciting players to watch today
+ * Returns top performers, in-form players, and players with upcoming high-stakes matches
+ */
+export const getExcitingPlayers = async (): Promise<Entity[]> => {
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0];
+  const cacheKey = `exciting_players_${dateStr}`;
+
+  const cached = getCachedData<Entity[]>(cacheKey);
+  if (cached) {
+    console.log(`✅ Cache hit: ${cacheKey}`);
+    return cached;
+  }
+  if (!process.env.API_KEY) return [];
+
+  const dedupKey = `exciting_players_${dateStr}`;
+  return dedupedApiCall(dedupKey, async () => {
+    try {
+      console.log(`🚀 Fetching exciting players for TODAY: ${dateStr}`);
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: `CRITICAL: Use Google Search to find the MOST IN-FORM football players for January 2026.
+
+SEARCH STRATEGY:
+- Search: "best football players January 2026 in form top scorers"
+- Search: "player of the week month ${dateStr} Premier League La Liga Bundesliga"
+- Use: whoscored.com, transfermarkt.com, espn.com/soccer, goal.com
+- Focus on 2025-26 season stats
+
+REQUIRED: Find EXACTLY 6 REAL players currently in exceptional form:
+1. Must be actively playing in January 2026
+2. Mix of positions: forwards, midfielders, defenders
+3. From major European leagues
+4. Based on ACTUAL recent performances (December 2025 - January 2026)
+
+For EACH player provide VERIFIED data:
+1. Full real name (verify spelling)
+2. Current club (confirm active roster January 2026)
+3. Position and jersey number (verify from official club site)
+4. 2025-26 season stats:
+   - Goals scored (exact number from transfermarkt/whoscored)
+   - Assists (exact number)
+   - Appearances (matches played)
+5. Recent form analysis:
+   - Performance in last 5 matches
+   - Any goals/assists in those matches
+   - Overall form rating
+6. Playing style and excitement factor (based on actual characteristics)
+7. Next real fixture details
+8. Excitement rating 7-10 (these should all be top performers)
+
+VERIFICATION: Cross-check all stats from at least 2 sources (transfermarkt + whoscored/espn).`,
+        config: {
+          tools: [{googleSearch: {}}],
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                name: { type: Type.STRING, description: "Player full name" },
+                team: { type: Type.STRING, description: "Current club" },
+                position: { type: Type.STRING, description: "Playing position" },
+                number: { type: Type.NUMBER, description: "Jersey number" },
+                league: { type: Type.STRING, description: "League they play in" },
+                goals: { type: Type.NUMBER, description: "Goals this season" },
+                assists: { type: Type.NUMBER, description: "Assists this season" },
+                appearances: { type: Type.NUMBER, description: "Appearances this season" },
+                recentForm: { type: Type.STRING, description: "Brief recent form description" },
+                excitementFactor: { type: Type.STRING, description: "Why exciting to watch" },
+                nextMatch: { type: Type.STRING, description: "Next match details" },
+                rating: { type: Type.NUMBER, description: "Excitement rating 0-10" }
+              }
+            }
+          }
+        }
+      });
+
+      const data = JSON.parse(response.text || "[]");
+      const players = data.map((item: any, idx: number) => {
+        const playerId = `player_${item.name.replace(/\s/g, '').toLowerCase()}`;
+        return {
+          id: playerId,
+          name: item.name,
+          type: 'PLAYER' as EntityType,
+          image: getGenericImage(playerId),
+          subtitle: `${item.position} • ${item.team}`,
+          rating: item.rating || 7.5,
+          league: normalizeLeague(item.league),
+          description: item.excitementFactor, // Use excitement factor as description
+          stats: {
+            goals: item.goals || 0,
+            assists: item.assists || 0,
+            appearances: item.appearances || 0,
+            number: item.number
+          },
+          recentForm: item.recentForm,
+          excitementFactor: item.excitementFactor,
+          nextMatch: item.nextMatch
+        };
+      });
+
+      // Cache for 24 hours (expires at day change)
+      setCachedData(cacheKey, players, 86400);
+      console.log(`✅ Fetched ${players.length} exciting players`);
+
+      return players;
+    } catch (error) {
+      console.error('❌ Exciting players error:', error);
+      return [];
+    }
+  });
 };

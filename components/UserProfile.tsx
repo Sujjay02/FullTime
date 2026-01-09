@@ -1,17 +1,21 @@
 
-import React from 'react';
-import { User, Review } from '../types';
+import React, { useState } from 'react';
+import { User, Review, Playlist, Match } from '../types';
 import StarRating from './StarRating';
-import { Edit2, List } from 'lucide-react';
+import { Edit2, List, ListVideo, ChevronRight, Play } from 'lucide-react';
 
 interface UserProfileProps {
   user: User;
   reviews: Review[];
+  playlists?: Playlist[];
+  matches?: Match[];
   isOwnProfile: boolean;
   onEntityClick: (entityId: string) => void;
+  onMatchClick?: (matchId: string) => void;
 }
 
-const UserProfile: React.FC<UserProfileProps> = ({ user, reviews, isOwnProfile, onEntityClick }) => {
+const UserProfile: React.FC<UserProfileProps> = ({ user, reviews, playlists = [], matches = [], isOwnProfile, onEntityClick, onMatchClick }) => {
+  const [activeTab, setActiveTab] = useState<'reviews' | 'playlists'>('reviews');
   // Sort reviews by date descending
   const sortedReviews = [...reviews].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
@@ -55,13 +59,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, reviews, isOwnProfile, 
                  </div>
                  <div className="w-px h-8 bg-dark-700"></div>
                  <div className="text-center md:text-left">
-                    <span className="block text-xl font-bold text-white font-mono">{avgRating}</span>
-                    <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Avg Rating</span>
+                    <span className="block text-xl font-bold text-white font-mono">{playlists.length}</span>
+                    <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Playlists</span>
                  </div>
                  <div className="w-px h-8 bg-dark-700"></div>
                  <div className="text-center md:text-left">
-                    <span className="block text-xl font-bold text-white font-mono">2024</span>
-                    <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Member Since</span>
+                    <span className="block text-xl font-bold text-white font-mono">{avgRating}</span>
+                    <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Avg Rating</span>
                  </div>
               </div>
            </div>
@@ -98,55 +102,136 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, reviews, isOwnProfile, 
 
            <div>
               <div className="flex items-center justify-between mb-6 border-b border-dark-700 pb-2">
-                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Recent Activity</h3>
-                  <div className="flex gap-2 text-gray-600">
-                     <List size={16} />
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setActiveTab('reviews')}
+                      className={`flex items-center gap-2 text-sm font-bold uppercase tracking-widest transition pb-2 border-b-2 ${
+                        activeTab === 'reviews'
+                          ? 'text-pitch-400 border-pitch-400'
+                          : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    >
+                      <List size={16} />
+                      Reviews ({totalReviews})
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('playlists')}
+                      className={`flex items-center gap-2 text-sm font-bold uppercase tracking-widest transition pb-2 border-b-2 ${
+                        activeTab === 'playlists'
+                          ? 'text-pitch-400 border-pitch-400'
+                          : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    >
+                      <ListVideo size={16} />
+                      Playlists ({playlists.length})
+                    </button>
                   </div>
               </div>
 
-              <div className="space-y-4">
-                 {sortedReviews.length > 0 ? (
-                    sortedReviews.map(review => (
-                       <div key={review.id} className="bg-dark-800 border border-dark-700 rounded-lg p-5 flex gap-5 hover:border-dark-600 transition">
-                          <div 
-                             onClick={() => onEntityClick(review.entityId)}
-                             className="w-16 h-24 shrink-0 rounded bg-dark-700 overflow-hidden cursor-pointer shadow-md"
-                          >
-                             {review.entityImage ? (
-                                <img src={review.entityImage} alt="Poster" className="w-full h-full object-cover" />
-                             ) : (
-                                <div className="w-full h-full bg-dark-600"></div>
-                             )}
-                          </div>
-                          
-                          <div className="flex-1">
-                             <div className="flex justify-between items-start mb-1">
-                                <div>
-                                   <h4 
-                                     onClick={() => onEntityClick(review.entityId)}
-                                     className="font-bold text-white hover:text-pitch-400 cursor-pointer text-lg leading-tight"
-                                   >
-                                      {review.entityName || 'Unknown Entity'}
-                                   </h4>
-                                   <span className="text-xs text-gray-500">{new Date(review.createdAt).toLocaleDateString()}</span>
+              {activeTab === 'reviews' ? (
+                <div className="space-y-4">
+                   {sortedReviews.length > 0 ? (
+                      sortedReviews.map(review => (
+                         <div key={review.id} className="bg-dark-800 border border-dark-700 rounded-lg p-5 flex gap-5 hover:border-dark-600 transition">
+                            <div
+                               onClick={() => onEntityClick(review.entityId)}
+                               className="w-16 h-24 shrink-0 rounded bg-dark-700 overflow-hidden cursor-pointer shadow-md"
+                            >
+                               {review.entityImage ? (
+                                  <img src={review.entityImage} alt="Poster" className="w-full h-full object-cover" />
+                               ) : (
+                                  <div className="w-full h-full bg-dark-600"></div>
+                               )}
+                            </div>
+
+                            <div className="flex-1">
+                               <div className="flex justify-between items-start mb-1">
+                                  <div>
+                                     <h4
+                                       onClick={() => onEntityClick(review.entityId)}
+                                       className="font-bold text-white hover:text-pitch-400 cursor-pointer text-lg leading-tight"
+                                     >
+                                        {review.entityName || 'Unknown Entity'}
+                                     </h4>
+                                     <span className="text-xs text-gray-500">{new Date(review.createdAt).toLocaleDateString()}</span>
+                                  </div>
+                                  <StarRating rating={review.rating} size={14} />
+                               </div>
+
+                               {review.comment && (
+                                  <p className="text-gray-300 text-sm leading-relaxed font-serif mt-2 line-clamp-3">
+                                     "{review.comment}"
+                                  </p>
+                               )}
+                            </div>
+                         </div>
+                      ))
+                   ) : (
+                      <div className="text-center py-12 bg-dark-800/50 rounded border border-dark-700/50 text-gray-500 italic">
+                         No reviews yet. Start watching and rating matches!
+                      </div>
+                   )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                   {playlists.length > 0 ? (
+                      playlists.map(playlist => {
+                        const playlistMatches = matches.filter(m => playlist.matchIds.includes(m.id));
+                        return (
+                          <div key={playlist.id} className="bg-dark-800 border border-dark-700 rounded-lg p-5 hover:border-dark-600 transition">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <ListVideo size={16} className="text-pitch-400" />
+                                  <h4 className="font-bold text-white text-lg">{playlist.name}</h4>
                                 </div>
-                                <StarRating rating={review.rating} size={14} />
-                             </div>
-                             
-                             {review.comment && (
-                                <p className="text-gray-300 text-sm leading-relaxed font-serif mt-2 line-clamp-3">
-                                   "{review.comment}"
-                                </p>
-                             )}
+                                <p className="text-gray-400 text-sm">{playlist.description}</p>
+                                <span className="text-xs text-gray-500 mt-1 block">
+                                  Created {new Date(playlist.createdAt).toLocaleDateString()} • {playlist.matchIds.length} matches
+                                </span>
+                              </div>
+                            </div>
+
+                            {playlistMatches.length > 0 && (
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4">
+                                {playlistMatches.slice(0, 6).map(match => (
+                                  <div
+                                    key={match.id}
+                                    onClick={() => onMatchClick && onMatchClick(match.id)}
+                                    className="relative aspect-video rounded bg-dark-700 overflow-hidden cursor-pointer group border border-dark-600 hover:border-pitch-500/50 transition"
+                                  >
+                                    <div
+                                      style={{ background: match.image }}
+                                      className="absolute inset-0 opacity-40 group-hover:opacity-60 transition"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                                      <Play size={24} className="text-white" />
+                                    </div>
+                                    <div className="absolute bottom-1 left-1 right-1">
+                                      <p className="text-[10px] font-bold text-white truncate">{match.name}</p>
+                                      {match.score && <p className="text-[9px] text-pitch-400">{match.score}</p>}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {playlist.matchIds.length === 0 && (
+                              <div className="text-center py-6 bg-dark-900/50 rounded border border-dark-700/50 text-gray-500 text-sm italic">
+                                No matches added yet
+                              </div>
+                            )}
                           </div>
-                       </div>
-                    ))
-                 ) : (
-                    <div className="text-center py-12 bg-dark-800/50 rounded border border-dark-700/50 text-gray-500 italic">
-                       No activity recorded yet.
-                    </div>
-                 )}
-              </div>
+                        );
+                      })
+                   ) : (
+                      <div className="text-center py-12 bg-dark-800/50 rounded border border-dark-700/50 text-gray-500 italic">
+                         No playlists created yet. Create your first playlist to organize your favorite matches!
+                      </div>
+                   )}
+                </div>
+              )}
            </div>
         </div>
 

@@ -19,6 +19,7 @@ export interface LineupPlayer {
   role?: string; // e.g. "Captain", "Playmaker"
   goals?: number;
   assists?: number;
+  watchability?: number; // Player excitement/form score 0-10
 }
 
 export interface Entity {
@@ -30,7 +31,12 @@ export interface Entity {
   subtitle?: string;
   rating?: number;
   description?: string;
-  stats?: Stat[];
+  stats?: Stat[] | {
+    goals?: number;
+    assists?: number;
+    appearances?: number;
+    number?: number;
+  };
   news?: NewsItem[];
   // Team-specific fields
   recentMatches?: Match[];
@@ -39,6 +45,10 @@ export interface Entity {
   squad?: LineupPlayer[];
   formation?: string;
   league?: string;
+  // Player-specific fields
+  recentForm?: string;
+  excitementFactor?: string;
+  nextMatch?: string;
 }
 
 export interface Review {

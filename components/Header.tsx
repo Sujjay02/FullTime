@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
-import { Search, Menu, User as UserIcon, LogOut, Settings, BarChart2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, Menu, User as UserIcon, LogOut, Settings, BarChart2, Loader2 } from 'lucide-react';
 import { User, League } from '../types';
+import { useDebounce } from '../hooks/useDebounce';
 
 interface HeaderProps {
   user: User | null;
@@ -12,11 +13,26 @@ interface HeaderProps {
   onGoHome: () => void;
   onProfileClick: (user: User) => void;
   onViewLeagues: () => void;
+  onViewAbout: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ user, onLogin, onLogout, onSearch, onSelectLeague, onGoHome, onProfileClick, onViewLeagues }) => {
+const Header: React.FC<HeaderProps> = ({ user, onLogin, onLogout, onSearch, onSelectLeague, onGoHome, onProfileClick, onViewLeagues, onViewAbout }) => {
   const [query, setQuery] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Debounce search query - waits 300ms after user stops typing
+  const debouncedQuery = useDebounce(query, 300);
+
+  // Auto-search when debounced query changes
+  useEffect(() => {
+    if (debouncedQuery.trim().length >= 2) {
+      setIsSearching(true);
+      onSearch(debouncedQuery);
+      // Reset searching state after a delay
+      setTimeout(() => setIsSearching(false), 500);
+    }
+  }, [debouncedQuery, onSearch]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,6 +40,14 @@ const Header: React.FC<HeaderProps> = ({ user, onLogin, onLogout, onSearch, onSe
       onSearch(query);
     }
   };
+
+  const handleQueryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setQuery(value);
+    if (value.trim().length >= 2) {
+      setIsSearching(true);
+    }
+  }, []);
 
   const handleProfileNav = () => {
     if (user) {
@@ -51,6 +75,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogin, onLogout, onSearch, onSe
                <BarChart2 size={16} />
                Leagues
              </button>
+             <button onClick={onViewAbout} className="text-gray-300 hover:text-white text-sm font-medium transition">About</button>
 
              <div className="relative group">
                <button className="text-gray-300 hover:text-white text-sm font-medium transition flex items-center gap-1">
@@ -84,14 +109,27 @@ const Header: React.FC<HeaderProps> = ({ user, onLogin, onLogout, onSearch, onSe
         {/* Search Bar */}
         <div className="flex-1 max-w-md hidden sm:block">
            <form onSubmit={handleSearchSubmit} className="relative">
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search matches, players, teams..." 
-                className="w-full bg-dark-800 border border-transparent focus:border-dark-600 rounded-full py-1.5 pl-10 pr-4 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:bg-dark-700 transition"
+                onChange={handleQueryChange}
+                placeholder="Search matches, players, teams..."
+                className="w-full bg-dark-800 border border-transparent focus:border-dark-600 rounded-full py-1.5 pl-10 pr-10 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:bg-dark-700 transition"
               />
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+              {isSearching ? (
+                <Loader2 size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-pitch-400 animate-spin" />
+              ) : (
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+              )}
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-xs"
+                >
+                  ✕
+                </button>
+              )}
            </form>
         </div>
 

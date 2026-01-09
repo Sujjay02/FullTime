@@ -36,6 +36,15 @@ const PlayerItem: React.FC<{ player: LineupPlayer; isHome: boolean }> = ({ playe
             <Footprints size={10} className="text-blue-400" />
             <span className="font-bold">{player.assists || 0}</span>
           </div>
+          {player.watchability !== undefined && (
+            <>
+              <div className="w-px h-3 bg-dark-600"></div>
+              <div className="flex items-center gap-1">
+                <Star size={10} className="text-yellow-400" />
+                <span className="font-bold text-yellow-400">{player.watchability.toFixed(1)}</span>
+              </div>
+            </>
+          )}
           <span className="text-gray-400 uppercase font-bold text-[8px] ml-1">Season</span>
        </div>
        <div className={`w-2 h-2 bg-dark-700 border-r border-b border-dark-600 rotate-45 absolute -bottom-1 ${isHome ? 'left-4' : 'right-4'}`}></div>
@@ -132,6 +141,85 @@ const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate, 
             </div>
           </div>
         </div>
+
+        {/* Player Profile Section */}
+        {entity.type === 'PLAYER' && (
+          <div className="mt-16 space-y-8">
+            {/* Player Description */}
+            {entity.description && (
+              <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-4 border-l-4 border-yellow-500 pl-4">
+                  <Star className="text-yellow-500" size={20} />
+                  <h3 className="text-lg font-black text-white uppercase tracking-widest">Why Watch This Player</h3>
+                </div>
+                <p className="text-gray-300 leading-relaxed">{entity.description}</p>
+              </div>
+            )}
+
+            {/* Player Stats Card */}
+            {typeof entity.stats === 'object' && 'goals' in entity.stats && (
+              <div className="bg-gradient-to-br from-pitch-900/40 via-yellow-900/20 to-dark-900 border border-pitch-600/30 rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-6 border-l-4 border-pitch-500 pl-4">
+                  <Trophy className="text-pitch-400" size={20} />
+                  <h3 className="text-lg font-black text-white uppercase tracking-widest">Season Statistics</h3>
+                  {entity.league && <span className="text-xs text-gray-500">{entity.league}</span>}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Shirt className="text-pitch-400" size={18} />
+                      <span className="text-xs text-gray-400 uppercase font-bold">Number</span>
+                    </div>
+                    <p className="text-3xl font-black text-white">{entity.stats.number || '-'}</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Goal className="text-pitch-400" size={18} />
+                      <span className="text-xs text-gray-400 uppercase font-bold">Goals</span>
+                    </div>
+                    <p className="text-3xl font-black text-pitch-400">{entity.stats.goals}</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Footprints className="text-blue-400" size={18} />
+                      <span className="text-xs text-gray-400 uppercase font-bold">Assists</span>
+                    </div>
+                    <p className="text-3xl font-black text-blue-400">{entity.stats.assists}</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Users className="text-gray-400" size={18} />
+                      <span className="text-xs text-gray-400 uppercase font-bold">Appearances</span>
+                    </div>
+                    <p className="text-3xl font-black text-white">{entity.stats.appearances}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Recent Form */}
+            {entity.recentForm && (
+              <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-4 border-l-4 border-orange-500 pl-4">
+                  <TrendingUp className="text-orange-500" size={20} />
+                  <h3 className="text-lg font-black text-white uppercase tracking-widest">Recent Form</h3>
+                </div>
+                <p className="text-gray-300 leading-relaxed">{entity.recentForm}</p>
+              </div>
+            )}
+
+            {/* Next Match */}
+            {entity.nextMatch && (
+              <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-4 border-l-4 border-blue-500 pl-4">
+                  <Activity className="text-blue-500" size={20} />
+                  <h3 className="text-lg font-black text-white uppercase tracking-widest">Next Match</h3>
+                </div>
+                <p className="text-gray-300 leading-relaxed">{entity.nextMatch}</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Team Match History Section */}
         {entity.type === 'TEAM' && (entity.squad || entity.recentMatches || entity.upcomingMatches) && (

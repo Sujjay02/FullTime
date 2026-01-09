@@ -40,8 +40,12 @@
               pitch: {
                 50: '#ecfdf5',
                 100: '#d1fae5',
+                300: '#6ee7b7',
+                400: '#34d399',
                 500: '#10b981',
                 600: '#059669',
+                700: '#047857',
+                800: '#065f46',
                 900: '#064e3b',
               },
               dark: {
@@ -50,6 +54,15 @@
                 700: '#2d2d2d',
                 600: '#404040',
               }
+            },
+            keyframes: {
+              shimmer: {
+                '0%': { backgroundPosition: '-200% 0' },
+                '100%': { backgroundPosition: '200% 0' }
+              }
+            },
+            animation: {
+              shimmer: 'shimmer 2s infinite linear'
             }
           }
         }
