@@ -36,6 +36,9 @@ export interface Entity {
   recentMatches?: Match[];
   upcomingMatches?: Match[];
   avgWatchability?: number;
+  squad?: LineupPlayer[];
+  formation?: string;
+  league?: string;
 }
 
 export interface Review {

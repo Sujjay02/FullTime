@@ -239,6 +239,42 @@ const App: React.FC = () => {
 
   const handleCloseReviewModal = useCallback(() => setIsModalOpen(false), []);
 
+  const handleSubmitReview = useCallback(async (rating: number, comment: string) => {
+    if (!user || !modalEntity) {
+      alert("Please login to submit a review.");
+      return;
+    }
+
+    try {
+      const review = {
+        entityId: modalEntity.id,
+        userId: user.id,
+        userName: user.name,
+        userAvatar: user.avatar,
+        rating,
+        comment,
+        createdAt: new Date().toISOString(),
+        likes: 0,
+        entityName: modalEntity.name,
+        entityImage: modalEntity.image,
+        entityType: modalEntity.type
+      };
+
+      console.log('Submitting review:', review);
+      const docRef = await addDoc(collection(db, 'reviews'), review);
+      console.log('Review saved with ID:', docRef.id);
+
+      // Add to reviews state
+      setReviews(prev => [{ id: docRef.id, ...review }, ...prev]);
+
+      alert("Review submitted successfully!");
+      setIsModalOpen(false);
+    } catch (error: any) {
+      console.error('Failed to submit review:', error);
+      alert(`Failed to submit review: ${error.message}. Make sure Firestore is enabled.`);
+    }
+  }, [user, modalEntity]);
+
   const handleLeagueClick = useCallback((l: League) => {
     setCurrentLeague(l);
     setView('HOME');
@@ -432,7 +468,7 @@ const App: React.FC = () => {
 
       {isModalOpen && modalEntity && (
         <Suspense fallback={null}>
-          <ReviewModal entity={modalEntity} onClose={handleCloseReviewModal} onSubmit={() => {}} />
+          <ReviewModal entity={modalEntity} onClose={handleCloseReviewModal} onSubmit={handleSubmitReview} />
         </Suspense>
       )}
     </div>

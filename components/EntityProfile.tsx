@@ -134,8 +134,53 @@ const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate, 
         </div>
 
         {/* Team Match History Section */}
-        {entity.type === 'TEAM' && (entity.recentMatches || entity.upcomingMatches) && (
+        {entity.type === 'TEAM' && (entity.squad || entity.recentMatches || entity.upcomingMatches) && (
           <div className="mt-16 space-y-8">
+            {/* Team Squad Section */}
+            {entity.squad && entity.squad.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-6 border-l-4 border-pitch-500 pl-4">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-black text-white uppercase tracking-widest">Current Squad</h3>
+                    <span className="text-xs text-gray-500">{entity.squad.length} Players</span>
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {entity.league && <span className="mr-3">{entity.league}</span>}
+                    {entity.formation && (
+                      <span className="px-2 py-1 bg-pitch-900/40 border border-pitch-700/50 rounded text-pitch-400 font-mono font-bold">
+                        {entity.formation}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {entity.squad.map((player, idx) => (
+                    <div key={idx} className="bg-dark-800 border border-dark-700 rounded-lg p-4 hover:border-pitch-600 transition group">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-pitch-900 border border-pitch-600 flex items-center justify-center font-mono text-sm font-black text-pitch-300 shrink-0">
+                          {player.number}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-bold text-white truncate group-hover:text-pitch-400 transition">{player.name}</h4>
+                          <p className="text-[10px] text-gray-500 uppercase font-bold mt-0.5">{player.position}</p>
+                          <div className="flex items-center gap-3 mt-2">
+                            <div className="flex items-center gap-1">
+                              <Goal size={10} className="text-pitch-400" />
+                              <span className="text-xs font-bold text-gray-300">{player.goals || 0}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Footprints size={10} className="text-blue-400" />
+                              <span className="text-xs font-bold text-gray-300">{player.assists || 0}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Team Watchability Score */}
             {entity.avgWatchability && (
               <div className="bg-gradient-to-br from-pitch-900/40 via-orange-900/20 to-dark-900 border border-pitch-600/30 rounded-xl p-6">

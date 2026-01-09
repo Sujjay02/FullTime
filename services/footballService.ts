@@ -12,6 +12,23 @@ if (!apiKey) {
 const ai = new GoogleGenAI({ apiKey: apiKey || '' });
 const modelName = "gemini-3-flash-preview";
 
+// Request deduplication - prevent multiple identical API calls
+const pendingRequests = new Map<string, Promise<any>>();
+
+const dedupedApiCall = async <T>(key: string, apiCall: () => Promise<T>): Promise<T> => {
+  if (pendingRequests.has(key)) {
+    console.log(`♻️ Reusing pending request: ${key}`);
+    return pendingRequests.get(key) as Promise<T>;
+  }
+
+  const promise = apiCall().finally(() => {
+    pendingRequests.delete(key);
+  });
+
+  pendingRequests.set(key, promise);
+  return promise;
+};
+
 const normalizeLeague = (input: string): string => {
   if (!input) return 'Unknown League';
   const l = input.toLowerCase();
@@ -135,41 +152,27 @@ const extractTeams = (item: any) => {
 export const getLiveMatches = async (leagueName?: string): Promise<Match[]> => {
   const cacheKey = `live_v2_${leagueName || 'all'}`;
   const cached = getCachedData<Match[]>(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    console.log(`✅ Cache hit: ${cacheKey}`);
+    return cached;
+  }
   if (!process.env.API_KEY) return INITIAL_LIVE_MATCHES;
 
-  try {
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
-    const dayOfWeek = now.getDay();
-    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - daysToMonday);
-    const weekStartStr = weekStart.toISOString().split('T')[0];
+  const dedupKey = `live_${leagueName || 'all'}`;
+  return dedupedApiCall(dedupKey, async () => {
+    try {
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const dayOfWeek = now.getDay();
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - daysToMonday);
+      const weekStartStr = weekStart.toISOString().split('T')[0];
 
-    const response = await ai.models.generateContent({
+      console.log(`🚀 API call: ${dedupKey} | Date range: ${weekStartStr} to ${dateStr}`);
+      const response = await ai.models.generateContent({
       model: modelName,
-      contents: `Find TOP 4-6 soccer matches from THIS WEEK (${weekStartStr} to ${dateStr}).
-
-CRITICAL REQUIREMENTS:
-1. Focus on MAJOR leagues: Premier League, La Liga, Bundesliga, Serie A, Champions League, Ligue 1
-2. For EACH match, you MUST provide:
-   - Complete Starting XI for BOTH teams (11 players each with name, number, position)
-   - Bench players for BOTH teams (at least 5 subs each)
-   - Match events (goals, cards, substitutions) with exact minute
-   - Player season stats (goals and assists for each player)
-3. Use REAL data from recent matches (last 7 days only)
-4. DO NOT return matches without complete lineups
-5. Ensure player names, numbers, and positions are ACCURATE
-
-Example player format:
-{
-  "name": "Mohamed Salah",
-  "number": 11,
-  "position": "FWD",
-  "goals": 15,
-  "assists": 8
-}`,
+      contents: `Find EXACTLY 4 matches between ${weekStartStr} and ${dateStr} (THIS WEEK ONLY). NO old matches. For EACH match, use ACTUAL lineups from THAT SPECIFIC DATE. Major leagues only. Include: match date, lineups (11 starters + bench), formations, events, stats.`,
       config: {
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",
@@ -224,11 +227,12 @@ Example player format:
       };
     });
 
-    setCachedData(cacheKey, matches, 1800); // Cache for 30 minutes
-    return matches;
-  } catch (error) {
-    return handleApiError(error, "Live Matches", INITIAL_LIVE_MATCHES);
-  }
+      setCachedData(cacheKey, matches, 1800); // Cache for 30 minutes
+      return matches;
+    } catch (error) {
+      return handleApiError(error, "Live Matches", INITIAL_LIVE_MATCHES);
+    }
+  });
 };
 
 export const getExcitingMatches = async (): Promise<Match[]> => {
@@ -237,18 +241,18 @@ export const getExcitingMatches = async (): Promise<Match[]> => {
   if (cached) return cached;
   if (!process.env.API_KEY) return INITIAL_EXCITING_MATCHES;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: `Find 4 high-drama soccer matches from the last 7 days.
+  return dedupedApiCall('exciting', async () => {
+    try {
+      const now = new Date();
+      const sevenDaysAgo = new Date(now);
+      sevenDaysAgo.setDate(now.getDate() - 7);
+      const startDate = sevenDaysAgo.toISOString().split('T')[0];
+      const endDate = now.toISOString().split('T')[0];
 
-REQUIREMENTS:
-- Must include COMPLETE Starting XI for BOTH teams (11 players each)
-- Must include Bench players (5+ subs per team)
-- Must include ALL match events (goals, cards, subs) with minutes
-- Must include player season stats (goals, assists)
-- Focus on exciting matches with comebacks, late goals, or high stakes
-- Only use REAL matches with VERIFIED lineups`,
+      console.log(`🚀 Exciting matches: ${startDate} to ${endDate}`);
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: `Find EXACTLY 4 exciting matches between ${startDate} and ${endDate} (last 7 days ONLY). NO old matches. Must have comebacks or late goals. For EACH match, use ACTUAL lineups from THAT SPECIFIC DATE. Include: match date, lineups, formations, events, stats.`,
       config: {
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",
@@ -278,11 +282,12 @@ REQUIREMENTS:
         events: item.events || []
       };
     });
-    setCachedData(cacheKey, matches, 3600);
-    return matches;
-  } catch (error) {
-    return handleApiError(error, "Exciting", INITIAL_EXCITING_MATCHES);
-  }
+      setCachedData(cacheKey, matches, 3600);
+      return matches;
+    } catch (error) {
+      return handleApiError(error, "Exciting", INITIAL_EXCITING_MATCHES);
+    }
+  });
 };
 
 export const getHighestScoringMatches = async (): Promise<Match[]> => {
@@ -291,18 +296,18 @@ export const getHighestScoringMatches = async (): Promise<Match[]> => {
   if (cached) return cached;
   if (!process.env.API_KEY) return INITIAL_HIGHEST_SCORING_MATCHES;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: `Find 4 high-scoring soccer matches (5+ total goals) from the last 7 days.
+  return dedupedApiCall('high_scoring', async () => {
+    try {
+      const now = new Date();
+      const sevenDaysAgo = new Date(now);
+      sevenDaysAgo.setDate(now.getDate() - 7);
+      const startDate = sevenDaysAgo.toISOString().split('T')[0];
+      const endDate = now.toISOString().split('T')[0];
 
-REQUIREMENTS:
-- Must include COMPLETE Starting XI for BOTH teams (11 players each)
-- Must include Bench players (5+ subs per team)
-- Must include ALL goal events with scorer names and minutes
-- Must include player season stats (goals, assists)
-- Focus on matches with 5+ combined goals
-- Only use REAL matches with VERIFIED lineups and scores`,
+      console.log(`🚀 High-scoring matches: ${startDate} to ${endDate}`);
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: `Find EXACTLY 4 high-scoring matches (5+ goals) between ${startDate} and ${endDate} (last 7 days ONLY). NO old matches. For EACH match, use ACTUAL lineups from THAT SPECIFIC DATE. Include: match date, lineups, formations, goal events, stats.`,
       config: {
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",
@@ -330,11 +335,12 @@ REQUIREMENTS:
         events: item.events || []
       } as Match;
     });
-    setCachedData(cacheKey, matches, 3600);
-    return matches;
-  } catch (error) {
-    return handleApiError(error, "Scoring", INITIAL_HIGHEST_SCORING_MATCHES);
-  }
+      setCachedData(cacheKey, matches, 3600);
+      return matches;
+    } catch (error) {
+      return handleApiError(error, "Scoring", INITIAL_HIGHEST_SCORING_MATCHES);
+    }
+  });
 };
 
 export const getLeagueMetrics = async (): Promise<LeagueMetric[]> => {
@@ -420,7 +426,7 @@ export const searchEntities = async (query: string): Promise<Entity[]> => {
   try {
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: `Search for soccer entities: "${query}". If searching for a TEAM, include their last 5 matches (with full match details, lineups, and watchability scores) and next 3 upcoming matches.`,
+      contents: `Search: "${query}". If TEAM: include squad (players with stats), formation, league, last 5 matches, next 3 fixtures, avg watchability.`,
       config: {
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",
@@ -433,7 +439,23 @@ export const searchEntities = async (query: string): Promise<Entity[]> => {
               type: { type: Type.STRING },
               subtitle: { type: Type.STRING },
               rating: { type: Type.NUMBER },
+              league: { type: Type.STRING, description: "League the team plays in" },
+              formation: { type: Type.STRING, description: "Preferred formation (e.g., '4-3-3')" },
               avgWatchability: { type: Type.NUMBER, description: "Average watchability of team's matches" },
+              squad: {
+                type: Type.ARRAY,
+                description: "Current squad - ALL players in the team",
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING },
+                    number: { type: Type.NUMBER },
+                    position: { type: Type.STRING },
+                    goals: { type: Type.NUMBER },
+                    assists: { type: Type.NUMBER }
+                  }
+                }
+              },
               recentMatches: {
                 type: Type.ARRAY,
                 description: "Last 5 matches played by this team",
@@ -458,8 +480,13 @@ export const searchEntities = async (query: string): Promise<Entity[]> => {
         image: getGenericImage(item.name),
         subtitle: item.subtitle,
         rating: item.rating,
-        avgWatchability: item.avgWatchability
+        avgWatchability: item.avgWatchability,
+        league: item.league,
+        formation: item.formation,
+        squad: item.squad || []
       };
+
+      console.log(`🔍 Team: ${item.name} | Squad: ${entity.squad?.length || 0} players | Formation: ${entity.formation || 'N/A'}`);
 
       // Convert recent matches if team
       if (item.recentMatches && Array.isArray(item.recentMatches)) {
