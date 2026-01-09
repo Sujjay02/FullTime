@@ -94,13 +94,13 @@ const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate, 
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
       <div className="relative h-64 md:h-80 w-full overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/60 to-transparent z-10"></div>
-        <img src={entity.image} className="w-full h-full object-cover opacity-30 blur-sm" alt="Banner" />
+        <div style={{ background: entity.image }} className="w-full h-full opacity-20" />
       </div>
 
       <div className="max-w-6xl mx-auto px-4 -mt-32 md:-mt-40 relative z-20">
         <div className="flex flex-col md:flex-row gap-8">
-          <div className="w-44 md:w-56 shrink-0 mx-auto md:mx-0 shadow-2xl rounded-lg overflow-hidden border border-dark-600 bg-dark-800">
-            <img src={entity.image} alt={entity.name} className="w-full h-full object-cover" />
+          <div className="w-44 md:w-56 shrink-0 mx-auto md:mx-0 shadow-2xl rounded-lg overflow-hidden border border-dark-600">
+            <div style={{ background: entity.image }} className="w-full aspect-[3/4]" />
           </div>
 
           <div className="flex-1 text-center md:text-left pt-6">
@@ -132,6 +132,101 @@ const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate, 
             </div>
           </div>
         </div>
+
+        {/* Team Match History Section */}
+        {entity.type === 'TEAM' && (entity.recentMatches || entity.upcomingMatches) && (
+          <div className="mt-16 space-y-8">
+            {/* Team Watchability Score */}
+            {entity.avgWatchability && (
+              <div className="bg-gradient-to-br from-pitch-900/40 via-orange-900/20 to-dark-900 border border-pitch-600/30 rounded-xl p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-pitch-600/20 border border-pitch-500 flex items-center justify-center">
+                      <TrendingUp size={24} className="text-pitch-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider">Average Match Watchability</h3>
+                      <p className="text-2xl font-black text-white mt-1">{entity.avgWatchability.toFixed(1)}<span className="text-sm text-gray-500">/10</span></p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400">Based on recent performances</p>
+                    <p className="text-[10px] text-pitch-400 font-bold uppercase tracking-wide mt-1">
+                      {entity.avgWatchability >= 8 ? '🔥 Must Watch Team' : entity.avgWatchability >= 6 ? '⚡ Exciting Team' : '📊 Competitive Team'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Recent Matches */}
+            {entity.recentMatches && entity.recentMatches.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-6 border-l-4 border-pitch-500 pl-4">
+                  <h3 className="text-lg font-black text-white uppercase tracking-widest">Recent Matches</h3>
+                  <span className="text-xs text-gray-500">Last 5 Games</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                  {entity.recentMatches.map((m) => (
+                    <div key={m.id} className="bg-dark-800 border border-dark-700 rounded-lg p-4 hover:border-pitch-600 transition group cursor-pointer">
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="text-[10px] text-gray-500 font-bold uppercase">{m.league}</span>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded ${
+                          m.watchability && m.watchability >= 8 ? 'bg-orange-900/40 text-orange-400' :
+                          m.watchability && m.watchability >= 6 ? 'bg-pitch-900/40 text-pitch-400' :
+                          'bg-dark-900 text-gray-500'
+                        }`}>
+                          {m.watchability?.toFixed(1)}
+                        </span>
+                      </div>
+                      <div className="text-center mb-2">
+                        <div className="text-xs text-gray-400 mb-1">{m.homeTeam}</div>
+                        <div className="text-2xl font-black text-white font-mono">{m.score}</div>
+                        <div className="text-xs text-gray-400 mt-1">{m.awayTeam}</div>
+                      </div>
+                      <div className="text-[10px] text-gray-600 text-center uppercase font-bold mt-2 pt-2 border-t border-dark-700">
+                        {m.status}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Upcoming Matches */}
+            {entity.upcomingMatches && entity.upcomingMatches.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-6 border-l-4 border-blue-500 pl-4">
+                  <h3 className="text-lg font-black text-white uppercase tracking-widest">Upcoming Fixtures</h3>
+                  <span className="text-xs text-gray-500">Next 3 Games</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {entity.upcomingMatches.map((m) => (
+                    <div key={m.id} className="bg-gradient-to-br from-blue-900/20 to-dark-900 border border-blue-700/30 rounded-lg p-5 hover:border-blue-500 transition group cursor-pointer">
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="text-[10px] text-blue-400 font-bold uppercase">{m.league}</span>
+                        {m.watchability && (
+                          <div className="flex items-center gap-1">
+                            <Activity size={12} className="text-blue-400" />
+                            <span className="text-[10px] font-black text-blue-400">{m.watchability.toFixed(1)}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-center mb-2">
+                        <div className="text-sm text-gray-300 mb-2">{m.homeTeam}</div>
+                        <div className="text-xs text-gray-500 font-bold">VS</div>
+                        <div className="text-sm text-gray-300 mt-2">{m.awayTeam}</div>
+                      </div>
+                      <div className="text-[10px] text-blue-500 text-center uppercase font-bold mt-3 pt-3 border-t border-blue-900/30">
+                        {m.minute || 'Upcoming'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {match && (
           <div className="mt-16 space-y-16">

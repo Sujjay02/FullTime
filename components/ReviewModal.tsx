@@ -33,10 +33,9 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ entity, onClose, onSubmit }) 
 
         {/* Content */}
         <div className="p-6 flex gap-6">
-           {/* Poster/Image */}
+           {/* Poster/Gradient */}
            <div className="w-24 shrink-0">
-             <div className="aspect-[2/3] rounded bg-dark-700 overflow-hidden shadow-lg border border-dark-600">
-                <img src={entity.image} alt={entity.name} className="w-full h-full object-cover" />
+             <div className="aspect-[2/3] rounded overflow-hidden shadow-lg border border-dark-600" style={{ background: entity.image }}>
              </div>
            </div>
 

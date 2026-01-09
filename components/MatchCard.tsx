@@ -25,18 +25,16 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, onClick, onLog, hoverEffec
       onClick={() => onClick(match.id)}
       className={`group relative flex flex-col gap-2 cursor-pointer ${hoverEffect ? 'hover:-translate-y-1 transition duration-300' : ''}`}
     >
-      {/* Image Container */}
-      <div className={`relative aspect-[16/9] bg-dark-800 rounded-lg overflow-hidden border shadow-md transition group-hover:shadow-pitch-900/20
+      {/* Gradient Background Container */}
+      <div className={`relative aspect-[16/9] rounded-lg overflow-hidden border shadow-md transition group-hover:shadow-pitch-900/20
           ${mustWatch ? 'border-orange-500/50 shadow-orange-900/20' : 'border-dark-700 group-hover:border-pitch-600/50'}`}>
-        <img 
-          src={match.image} 
-          alt={match.name} 
-          className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition duration-500"
-          loading="lazy"
+        <div
+          style={{ background: match.image }}
+          className="absolute inset-0 opacity-40 group-hover:opacity-50 transition duration-500"
         />
-        
-        {/* Overlay gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-90 group-hover:opacity-70 transition"></div>
+
+        {/* Overlay gradient for contrast */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
 
         {/* Live Indicator or Score */}
         <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">

@@ -2,7 +2,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Entity, EntityType, Match, MatchStatus, League, LeagueMetric } from "../types";
 import { getCachedData, setCachedData } from "./cacheService";
-import { INITIAL_LIVE_MATCHES, INITIAL_EXCITING_MATCHES, INITIAL_HIGHEST_SCORING_MATCHES, getGenericImage } from "../constants";
+import { INITIAL_LIVE_MATCHES, INITIAL_EXCITING_MATCHES, INITIAL_HIGHEST_SCORING_MATCHES, INITIAL_LEAGUE_METRICS, getGenericImage } from "../constants";
 
 // Initialize Gemini API client directly with process.env.API_KEY following strict guidelines
 const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
@@ -149,10 +149,27 @@ export const getLiveMatches = async (leagueName?: string): Promise<Match[]> => {
 
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: `Find TOP soccer matches from THIS WEEK (from ${weekStartStr} to ${dateStr}).
-      Focus on MAJOR leagues: Premier League, La Liga, Bundesliga, Serie A, Champions League, Ligue 1.
-      For each match, provide the ACCURATE Starting XI, Bench, and Events with season stats.
-      Return matches from the last 7 days maximum. Do NOT return old matches from months ago.`,
+      contents: `Find TOP 4-6 soccer matches from THIS WEEK (${weekStartStr} to ${dateStr}).
+
+CRITICAL REQUIREMENTS:
+1. Focus on MAJOR leagues: Premier League, La Liga, Bundesliga, Serie A, Champions League, Ligue 1
+2. For EACH match, you MUST provide:
+   - Complete Starting XI for BOTH teams (11 players each with name, number, position)
+   - Bench players for BOTH teams (at least 5 subs each)
+   - Match events (goals, cards, substitutions) with exact minute
+   - Player season stats (goals and assists for each player)
+3. Use REAL data from recent matches (last 7 days only)
+4. DO NOT return matches without complete lineups
+5. Ensure player names, numbers, and positions are ACCURATE
+
+Example player format:
+{
+  "name": "Mohamed Salah",
+  "number": 11,
+  "position": "FWD",
+  "goals": 15,
+  "assists": 8
+}`,
       config: {
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",
@@ -164,15 +181,28 @@ export const getLiveMatches = async (leagueName?: string): Promise<Match[]> => {
     });
 
     const data = JSON.parse(response.text || "[]");
-    const matches = data.map((item: any) => {
+    console.log('🔍 API returned', data.length, 'matches');
+
+    const matches = data.map((item: any, idx: number) => {
       const { home, away } = extractTeams(item);
       const id = `match_${home}_${away}`.replace(/\s/g, '').toLowerCase();
       const leagueStr = normalizeLeague(item.league);
 
-      // Debug logging for lineups
-      console.log(`Match: ${home} vs ${away}`);
-      console.log('Home lineup:', item.lineupHome?.length || 0, 'players');
-      console.log('Away lineup:', item.lineupAway?.length || 0, 'players');
+      // Detailed logging for lineups
+      const homeLineupCount = item.lineupHome?.length || 0;
+      const awayLineupCount = item.lineupAway?.length || 0;
+      const homeBenchCount = item.benchHome?.length || 0;
+      const awayBenchCount = item.benchAway?.length || 0;
+
+      console.log(`\n📊 Match ${idx + 1}: ${home} vs ${away}`);
+      console.log(`   League: ${leagueStr} | Score: ${item.score || 'N/A'}`);
+      console.log(`   ✅ Home XI: ${homeLineupCount} players | Bench: ${homeBenchCount}`);
+      console.log(`   ✅ Away XI: ${awayLineupCount} players | Bench: ${awayBenchCount}`);
+      console.log(`   ⚽ Events: ${item.events?.length || 0}`);
+
+      if (homeLineupCount === 0 || awayLineupCount === 0) {
+        console.warn(`   ⚠️ WARNING: Missing lineups for ${home} vs ${away}`);
+      }
 
       return {
         id,
@@ -194,7 +224,7 @@ export const getLiveMatches = async (leagueName?: string): Promise<Match[]> => {
       };
     });
 
-    setCachedData(cacheKey, matches, 300);
+    setCachedData(cacheKey, matches, 1800); // Cache for 30 minutes
     return matches;
   } catch (error) {
     return handleApiError(error, "Live Matches", INITIAL_LIVE_MATCHES);
@@ -210,7 +240,15 @@ export const getExcitingMatches = async (): Promise<Match[]> => {
   try {
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: "Find 4 high-drama soccer matches from the last 7 days with full lineups, season stats, and event timelines.",
+      contents: `Find 4 high-drama soccer matches from the last 7 days.
+
+REQUIREMENTS:
+- Must include COMPLETE Starting XI for BOTH teams (11 players each)
+- Must include Bench players (5+ subs per team)
+- Must include ALL match events (goals, cards, subs) with minutes
+- Must include player season stats (goals, assists)
+- Focus on exciting matches with comebacks, late goals, or high stakes
+- Only use REAL matches with VERIFIED lineups`,
       config: {
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",
@@ -256,7 +294,15 @@ export const getHighestScoringMatches = async (): Promise<Match[]> => {
   try {
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: "Find 4 high-scoring soccer matches from the last 7 days with full match data and player season stats.",
+      contents: `Find 4 high-scoring soccer matches (5+ total goals) from the last 7 days.
+
+REQUIREMENTS:
+- Must include COMPLETE Starting XI for BOTH teams (11 players each)
+- Must include Bench players (5+ subs per team)
+- Must include ALL goal events with scorer names and minutes
+- Must include player season stats (goals, assists)
+- Focus on matches with 5+ combined goals
+- Only use REAL matches with VERIFIED lineups and scores`,
       config: {
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",
@@ -292,11 +338,20 @@ export const getHighestScoringMatches = async (): Promise<Match[]> => {
 };
 
 export const getLeagueMetrics = async (): Promise<LeagueMetric[]> => {
-  if (!process.env.API_KEY) return [];
+  if (!apiKey) {
+    console.warn('⚠️ No API key - returning static league metrics');
+    return INITIAL_LEAGUE_METRICS;
+  }
+
   try {
-    const response = await ai.models.generateContent({
+    console.log('🏆 Fetching league metrics...');
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Request timeout after 30 seconds')), 30000)
+    );
+
+    const apiCall = ai.models.generateContent({
       model: modelName,
-      contents: "Rank the top 5 European soccer leagues based on current season entertainment and watchability. Include the 'match of the week' for each league with its lineups.",
+      contents: "Rank the top 5 European soccer leagues (Premier League, La Liga, Bundesliga, Serie A, Ligue 1) based on current season entertainment and watchability. Include the 'match of the week' for each league with its lineups.",
       config: {
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",
@@ -314,11 +369,14 @@ export const getLeagueMetrics = async (): Promise<LeagueMetric[]> => {
         }
       }
     });
+
+    const response = await Promise.race([apiCall, timeoutPromise]) as any;
+    console.log('✅ League metrics fetched successfully');
     const data = JSON.parse(response.text || "[]");
     return data.map((item: any, idx: number) => {
       const lgName = normalizeLeague(item.leagueName);
       let mappedTopMatch: Match | undefined = undefined;
-      
+
       if (item.topMatch) {
          const { home, away } = extractTeams(item.topMatch);
          const tmId = `tm_${lgName}_${idx}`.replace(/\s/g, '');
@@ -352,7 +410,8 @@ export const getLeagueMetrics = async (): Promise<LeagueMetric[]> => {
       };
     });
   } catch (error) {
-    return [];
+    console.error('❌ Error fetching league metrics:', error);
+    return handleApiError(error, "League Metrics", INITIAL_LEAGUE_METRICS);
   }
 };
 
@@ -361,7 +420,7 @@ export const searchEntities = async (query: string): Promise<Entity[]> => {
   try {
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: `Search for soccer entities: "${query}".`,
+      contents: `Search for soccer entities: "${query}". If searching for a TEAM, include their last 5 matches (with full match details, lineups, and watchability scores) and next 3 upcoming matches.`,
       config: {
         tools: [{googleSearch: {}}],
         responseMimeType: "application/json",
@@ -373,20 +432,91 @@ export const searchEntities = async (query: string): Promise<Entity[]> => {
               name: { type: Type.STRING },
               type: { type: Type.STRING },
               subtitle: { type: Type.STRING },
-              rating: { type: Type.NUMBER }
+              rating: { type: Type.NUMBER },
+              avgWatchability: { type: Type.NUMBER, description: "Average watchability of team's matches" },
+              recentMatches: {
+                type: Type.ARRAY,
+                description: "Last 5 matches played by this team",
+                items: LINEUP_SCHEMA
+              },
+              upcomingMatches: {
+                type: Type.ARRAY,
+                description: "Next 3 upcoming matches for this team",
+                items: LINEUP_SCHEMA
+              }
             }
           }
         }
       }
     });
     const data = JSON.parse(response.text || "[]");
-    return data.map((item: any, idx: number) => ({
-      ...item,
-      id: `s_${idx}_${Date.now()}`,
-      image: getGenericImage(item.name),
-      type: (item.type?.toUpperCase() as EntityType) || 'TEAM'
-    }));
+    return data.map((item: any, idx: number) => {
+      const entity: Entity = {
+        id: `s_${idx}_${Date.now()}`,
+        name: item.name,
+        type: (item.type?.toUpperCase() as EntityType) || 'TEAM',
+        image: getGenericImage(item.name),
+        subtitle: item.subtitle,
+        rating: item.rating,
+        avgWatchability: item.avgWatchability
+      };
+
+      // Convert recent matches if team
+      if (item.recentMatches && Array.isArray(item.recentMatches)) {
+        entity.recentMatches = item.recentMatches.map((m: any, mIdx: number) => {
+          const { home, away } = extractTeams(m);
+          const matchId = `recent_${entity.id}_${mIdx}`;
+          return {
+            id: matchId,
+            name: `${home} vs ${away}`,
+            type: 'MATCH' as const,
+            homeTeam: home,
+            awayTeam: away,
+            score: m.score || '0-0',
+            minute: m.minute || 'FT',
+            status: (m.status?.toUpperCase() as MatchStatus) || 'FT',
+            league: normalizeLeague(m.league),
+            subtitle: `${normalizeLeague(m.league)} • ${m.minute || 'FT'}`,
+            image: getGenericImage(matchId),
+            watchability: m.watchability || 5.0,
+            formation: { home: m.formationHome || "4-3-3", away: m.formationAway || "4-3-3" },
+            lineups: { home: m.lineupHome || [], away: m.lineupAway || [] },
+            bench: { home: m.benchHome || [], away: m.benchAway || [] },
+            events: m.events || []
+          };
+        });
+      }
+
+      // Convert upcoming matches if team
+      if (item.upcomingMatches && Array.isArray(item.upcomingMatches)) {
+        entity.upcomingMatches = item.upcomingMatches.map((m: any, mIdx: number) => {
+          const { home, away } = extractTeams(m);
+          const matchId = `upcoming_${entity.id}_${mIdx}`;
+          return {
+            id: matchId,
+            name: `${home} vs ${away}`,
+            type: 'MATCH' as const,
+            homeTeam: home,
+            awayTeam: away,
+            score: m.score || 'vs',
+            minute: m.minute || 'UPCOMING',
+            status: 'UPCOMING' as const,
+            league: normalizeLeague(m.league),
+            subtitle: `${normalizeLeague(m.league)} • ${m.minute || 'Upcoming'}`,
+            image: getGenericImage(matchId),
+            watchability: m.watchability || 7.0,
+            formation: { home: m.formationHome || "4-3-3", away: m.formationAway || "4-3-3" },
+            lineups: { home: m.lineupHome || [], away: m.lineupAway || [] },
+            bench: { home: m.benchHome || [], away: m.benchAway || [] },
+            events: []
+          };
+        });
+      }
+
+      return entity;
+    });
   } catch (error) {
+    console.error('Search error:', error);
     return [];
   }
 };

@@ -104,16 +104,31 @@ const App: React.FC = () => {
 
   const handleCreatePlaylist = useCallback(async (name: string) => {
     if (!user) return;
-    const newPlaylist = {
-      name,
-      description: 'A custom collection of matches.',
-      userId: user.id,
-      matchIds: [],
-      createdAt: new Date().toISOString()
-    };
-    const docRef = await addDoc(collection(db, 'playlists'), newPlaylist);
-    setPlaylists(prev => [...prev, { id: docRef.id, ...newPlaylist } as Playlist]);
-  }, [user]);
+    try {
+      const newPlaylist = {
+        name,
+        description: 'A custom collection of matches.',
+        userId: user.id,
+        matchIds: [],
+        createdAt: new Date().toISOString()
+      };
+      console.log('Creating playlist:', newPlaylist);
+      const docRef = await addDoc(collection(db, 'playlists'), newPlaylist);
+      console.log('Playlist created with ID:', docRef.id);
+      const playlist = { id: docRef.id, ...newPlaylist } as Playlist;
+      setPlaylists(prev => [...prev, playlist]);
+
+      // Clear cache to force refresh
+      const cacheKey = `playlists_${user.id}`;
+      setCachedData(cacheKey, [...playlists, playlist], 600);
+
+      setIsPlaylistModalOpen(false);
+      alert(`List "${name}" created successfully!`);
+    } catch (error: any) {
+      console.error('Failed to create playlist:', error);
+      alert(`Failed to create list: ${error.message}. Make sure you're logged in and Firestore is enabled.`);
+    }
+  }, [user, playlists]);
 
   const handleAddToPlaylist = useCallback(async (playlistId: string, matchId: string) => {
     setPlaylists(prev => {
@@ -154,14 +169,14 @@ const App: React.FC = () => {
       } catch (err) { setReviews([]); }
   }, []);
 
-  // Auto-refresh live matches every 30 seconds
+  // Auto-refresh live matches every 10 minutes (respects 30-min cache)
   useEffect(() => {
     fetchLive();
 
     const interval = setInterval(() => {
       console.log('Auto-refreshing live matches...');
       fetchLive();
-    }, 30000); // 30 seconds
+    }, 600000); // 10 minutes
 
     return () => clearInterval(interval);
   }, [fetchLive]);

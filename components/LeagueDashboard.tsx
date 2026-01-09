@@ -48,8 +48,18 @@ const LeagueDashboard: React.FC<LeagueDashboardProps> = ({ metrics, onLeagueClic
       </div>
 
       {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pitch-500"></div>
+          <div className="flex flex-col items-center justify-center py-20">
+             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pitch-500 mb-4"></div>
+             <p className="text-gray-400 text-sm">Loading league data...</p>
+          </div>
+      ) : filteredMetrics.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+             <Trophy size={48} className="text-gray-600 mb-4" />
+             <h3 className="text-xl font-bold text-gray-400 mb-2">No League Data Available</h3>
+             <p className="text-gray-500 text-sm max-w-md">
+               Unable to fetch league metrics. This could be due to API limitations.
+               Check the browser console for details or try refreshing the page.
+             </p>
           </div>
       ) : (
         <div className="grid grid-cols-1 gap-6">

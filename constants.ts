@@ -1,27 +1,30 @@
 
 import { Match, League } from './types';
 
-export const GENERIC_IMAGES = [
-  'https://images.unsplash.com/photo-1522778119026-d647f0596c20?w=800&auto=format&fit=crop', // Soccer field
-  'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop', // Stadium
-  'https://images.unsplash.com/photo-1589487391730-58f20eb2c308?w=800&auto=format&fit=crop', // Ball
-  'https://images.unsplash.com/photo-1560272564-c83b66b1ad12?w=800&auto=format&fit=crop', // Goal net
-  'https://images.unsplash.com/photo-1606925797300-0b35e9d1794e?w=800&auto=format&fit=crop', // Match action
-  'https://images.unsplash.com/photo-1577223625816-7546f98b3008?w=800&auto=format&fit=crop', // Crowd
-  'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=800&auto=format&fit=crop', // Stadium lights
-  'https://images.unsplash.com/photo-1579952363873-27f3bde9be2b?w=800&auto=format&fit=crop'  // Players
+// Colorful gradient backgrounds for match cards (no external images needed)
+export const GRADIENT_BACKGROUNDS = [
+  'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', // Purple
+  'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', // Pink-Red
+  'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', // Blue
+  'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', // Green-Cyan
+  'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', // Pink-Yellow
+  'linear-gradient(135deg, #30cfd0 0%, #330867 100%)', // Cyan-Purple
+  'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', // Pastel
+  'linear-gradient(135deg, #ff9a56 0%, #ff6a88 100%)', // Orange-Pink
+  'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)', // Peach
+  'linear-gradient(135deg, #ff6e7f 0%, #bfe9ff 100%)', // Red-Blue
 ];
 
 /**
- * Deterministically returns a generic soccer image based on an ID string.
+ * Deterministically returns a gradient background based on an ID string.
  */
 export const getGenericImage = (id: string) => {
   let hash = 0;
   for (let i = 0; i < id.length; i++) {
     hash = id.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const index = Math.abs(hash) % GENERIC_IMAGES.length;
-  return GENERIC_IMAGES[index];
+  const index = Math.abs(hash) % GRADIENT_BACKGROUNDS.length;
+  return GRADIENT_BACKGROUNDS[index];
 };
 
 export const INITIAL_LIVE_MATCHES: Match[] = [
@@ -154,3 +157,112 @@ export const MOCK_USER = {
   avatar: 'https://ui-avatars.com/api/?name=Pep+Fanatico&background=random',
   bio: 'Watching football since 1998. Tactical analysis enthusiast.'
 };
+
+// Static fallback league metrics (updated periodically)
+export const INITIAL_LEAGUE_METRICS = [
+  {
+    id: 'lg_1',
+    name: League.PREMIER_LEAGUE,
+    avgWatchability: 9.2,
+    matchCount: 15,
+    logo: 'https://ui-avatars.com/api/?name=PL&background=3d195b&color=fff&bold=true',
+    topMatch: {
+      id: 'tm_pl_1',
+      name: 'Arsenal vs Chelsea',
+      type: 'MATCH' as const,
+      homeTeam: 'Arsenal',
+      awayTeam: 'Chelsea',
+      score: '2-1',
+      minute: 'FT',
+      status: 'FT' as const,
+      league: League.PREMIER_LEAGUE,
+      subtitle: 'Premier League • Emirates Stadium',
+      image: getGenericImage('tm_pl_1'),
+      watchability: 11.5
+    }
+  },
+  {
+    id: 'lg_2',
+    name: League.LA_LIGA,
+    avgWatchability: 8.8,
+    matchCount: 12,
+    logo: 'https://ui-avatars.com/api/?name=LL&background=ff6900&color=fff&bold=true',
+    topMatch: {
+      id: 'tm_ll_1',
+      name: 'Real Madrid vs Atletico',
+      type: 'MATCH' as const,
+      homeTeam: 'Real Madrid',
+      awayTeam: 'Atletico Madrid',
+      score: '3-2',
+      minute: 'FT',
+      status: 'FT' as const,
+      league: League.LA_LIGA,
+      subtitle: 'La Liga • Santiago Bernabéu',
+      image: getGenericImage('tm_ll_1'),
+      watchability: 12.0
+    }
+  },
+  {
+    id: 'lg_3',
+    name: League.BUNDESLIGA,
+    avgWatchability: 8.5,
+    matchCount: 14,
+    logo: 'https://ui-avatars.com/api/?name=BL&background=d20515&color=fff&bold=true',
+    topMatch: {
+      id: 'tm_bl_1',
+      name: 'Bayern vs Leverkusen',
+      type: 'MATCH' as const,
+      homeTeam: 'Bayern Munich',
+      awayTeam: 'Bayer Leverkusen',
+      score: '4-3',
+      minute: 'FT',
+      status: 'FT' as const,
+      league: League.BUNDESLIGA,
+      subtitle: 'Bundesliga • Allianz Arena',
+      image: getGenericImage('tm_bl_1'),
+      watchability: 13.0
+    }
+  },
+  {
+    id: 'lg_4',
+    name: League.SERIE_A,
+    avgWatchability: 7.9,
+    matchCount: 13,
+    logo: 'https://ui-avatars.com/api/?name=SA&background=024494&color=fff&bold=true',
+    topMatch: {
+      id: 'tm_sa_1',
+      name: 'Inter vs AC Milan',
+      type: 'MATCH' as const,
+      homeTeam: 'Inter Milan',
+      awayTeam: 'AC Milan',
+      score: '1-1',
+      minute: 'FT',
+      status: 'FT' as const,
+      league: League.SERIE_A,
+      subtitle: 'Serie A • San Siro',
+      image: getGenericImage('tm_sa_1'),
+      watchability: 9.5
+    }
+  },
+  {
+    id: 'lg_5',
+    name: League.LIGUE_1,
+    avgWatchability: 7.3,
+    matchCount: 11,
+    logo: 'https://ui-avatars.com/api/?name=L1&background=dae025&color=000&bold=true',
+    topMatch: {
+      id: 'tm_l1_1',
+      name: 'PSG vs Marseille',
+      type: 'MATCH' as const,
+      homeTeam: 'PSG',
+      awayTeam: 'Marseille',
+      score: '3-0',
+      minute: 'FT',
+      status: 'FT' as const,
+      league: League.LIGUE_1,
+      subtitle: 'Ligue 1 • Parc des Princes',
+      image: getGenericImage('tm_l1_1'),
+      watchability: 10.0
+    }
+  }
+];

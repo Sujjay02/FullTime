@@ -27,11 +27,15 @@ export interface Entity {
   type: EntityType;
   image?: string;
   imageCredit?: string;
-  subtitle?: string; 
+  subtitle?: string;
   rating?: number;
   description?: string;
   stats?: Stat[];
   news?: NewsItem[];
+  // Team-specific fields
+  recentMatches?: Match[];
+  upcomingMatches?: Match[];
+  avgWatchability?: number;
 }
 
 export interface Review {
