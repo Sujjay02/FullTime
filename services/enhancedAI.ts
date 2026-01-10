@@ -115,7 +115,7 @@ Return ONLY valid JSON, nothing else.`;
         model: modelName,
         contents: prompt
       });
-      return response.text || '';
+      return response.text || response.response?.text() || '';
     });
 
     // Extract and validate JSON
@@ -253,7 +253,7 @@ export async function analyzeMatchExcitement(
         model: modelName,
         contents: prompt
       });
-      return response.text || '';
+      return response.text || response.response?.text() || '';
     });
 
     const jsonMatch = result.trim().match(/\{[\s\S]*\}/);
@@ -316,7 +316,7 @@ export async function analyzePlayerForm(
         model: modelName,
         contents: prompt
       });
-      return response.text || '';
+      return response.text || response.response?.text() || '';
     });
 
     const jsonMatch = result.trim().match(/\{[\s\S]*\}/);

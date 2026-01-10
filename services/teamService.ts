@@ -113,7 +113,8 @@ Respond ONLY with valid JSON, no other text.`;
       model: modelName,
       contents: prompt
     });
-    const responseText = result.text || '';
+    console.log('📦 AI Response:', result);
+    const responseText = result.text || result.response?.text() || '';
 
     // Parse JSON from response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);

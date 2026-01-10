@@ -262,16 +262,26 @@ const App: React.FC = () => {
           liveData = liveData.filter(m => m.league === currentLeague);
         }
 
+        if (liveData.length > 0) {
+          console.log(`✅ Using API-Football: ${liveData.length} matches loaded`);
+        }
+
         // TIER 2: If API-Football fails, try football-data.org hybrid
         if (liveData.length === 0) {
           console.log('🥈 Tier 2: Trying football-data.org hybrid...');
           liveData = await getHybridLiveMatches(currentLeague || undefined);
+          if (liveData.length > 0) {
+            console.log(`✅ Using football-data.org hybrid: ${liveData.length} matches loaded`);
+          }
         }
 
         // TIER 3: If both APIs fail, fall back to AI-only mode
         if (liveData.length === 0) {
-          console.log('🥉 Tier 3: Falling back to AI-only mode...');
+          console.log('🥉 Tier 3: Falling back to Gemini AI-only mode...');
           liveData = await getLiveMatches(currentLeague || undefined);
+          if (liveData.length > 0) {
+            console.log(`✅ Using Gemini AI: ${liveData.length} matches generated`);
+          }
         }
 
         setFeaturedMatches(liveData);
@@ -755,11 +765,16 @@ const App: React.FC = () => {
                     {isRefreshing ? 'Refreshing...' : 'Refresh'}
                   </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-dark-700 scrollbar-track-dark-900 hover:scrollbar-thumb-pitch-600">
                    {isRefreshing && filteredFeaturedMatches.length === 0 ? (
-                     <LoadingSkeleton type="match" count={4} />
+                     <>
+                       <div className="flex-shrink-0 w-80"><LoadingSkeleton type="match" count={1} /></div>
+                       <div className="flex-shrink-0 w-80"><LoadingSkeleton type="match" count={1} /></div>
+                       <div className="flex-shrink-0 w-80"><LoadingSkeleton type="match" count={1} /></div>
+                       <div className="flex-shrink-0 w-80"><LoadingSkeleton type="match" count={1} /></div>
+                     </>
                    ) : filteredFeaturedMatches.length > 0 ? filteredFeaturedMatches.map(m => (
-                     <div key={m.id} className="relative group">
+                     <div key={m.id} className="relative group flex-shrink-0 w-80 snap-start">
                         <EnhancedMatchCard match={m} onClick={() => handleEntityClick(m)} />
                         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition z-10">
                            <button onClick={(e) => { e.stopPropagation(); setModalEntity(m); setIsModalOpen(true); }} className="p-1.5 bg-black/60 rounded-full text-white hover:bg-pitch-600"><Plus size={14}/></button>
@@ -767,7 +782,7 @@ const App: React.FC = () => {
                         </div>
                      </div>
                    )) : (
-                     <div className="col-span-full text-center py-12 text-gray-500">
+                     <div className="w-full text-center py-12 text-gray-500">
                        No matches found for {currentLeague}. Try selecting a different league.
                      </div>
                    )}
