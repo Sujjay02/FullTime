@@ -66,7 +66,12 @@ const Header: React.FC<HeaderProps> = ({ user, onLogin, onLogout, onSearch, onSe
              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-pitch-600 to-green-300 flex items-center justify-center">
                 <span className="font-bold text-dark-900 text-lg">F</span>
              </div>
-             <span className="font-bold text-xl tracking-tight text-white group-hover:text-pitch-500 transition">FullTime</span>
+             <div className="flex items-center gap-2">
+               <span className="font-bold text-xl tracking-tight text-white group-hover:text-pitch-500 transition">FullTime</span>
+               <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-full shadow-lg animate-pulse">
+                 Beta
+               </span>
+             </div>
           </button>
 
           <nav className="hidden md:flex items-center gap-6">

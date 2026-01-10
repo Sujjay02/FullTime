@@ -7,16 +7,18 @@ import {
   signOut as firebaseSignOut, 
   onAuthStateChanged as firebaseOnAuthStateChanged 
 } from 'firebase/auth';
-import { 
-  getFirestore, 
-  collection as firebaseCollection, 
-  addDoc as firebaseAddDoc, 
-  query as firebaseQuery, 
-  where as firebaseWhere, 
-  getDocs as firebaseGetDocs, 
+import {
+  getFirestore,
+  collection as firebaseCollection,
+  addDoc as firebaseAddDoc,
+  query as firebaseQuery,
+  where as firebaseWhere,
+  getDocs as firebaseGetDocs,
   orderBy as firebaseOrderBy,
   updateDoc as firebaseUpdateDoc,
-  doc as firebaseDoc
+  doc as firebaseDoc,
+  getDoc as firebaseGetDoc,
+  setDoc as firebaseSetDoc
 } from 'firebase/firestore';
 
 // --- FIREBASE CONFIGURATION ---
@@ -74,6 +76,8 @@ let _onAuthStateChanged = (auth: any, cb: any): any => {};
 let _collection = (db: any, name: string): any => {};
 let _addDoc = async (ref: any, data: any): Promise<any> => {};
 let _getDocs = async (q: any): Promise<any> => {};
+let _getDoc = async (ref: any): Promise<any> => {};
+let _setDoc = async (ref: any, data: any): Promise<void> => {};
 let _updateDoc = async (ref: any, data: any): Promise<void> => {};
 let _doc = (db: any, path: string, ...pathSegments: string[]): any => {};
 let _query = (ref: any, ...constraints: any[]): any => {};
@@ -117,6 +121,8 @@ if (isFirebaseConfigured) {
     _collection = firebaseCollection;
     _addDoc = firebaseAddDoc;
     _getDocs = firebaseGetDocs;
+    _getDoc = firebaseGetDoc;
+    _setDoc = firebaseSetDoc;
     _updateDoc = firebaseUpdateDoc;
     _doc = firebaseDoc;
     _query = firebaseQuery;
@@ -175,20 +181,35 @@ function initMockMode() {
 
   // Mock Firestore (In-Memory)
   _collection = (db: any, name: string) => ({ type: 'collection', path: name });
-  
+
   // Implement mock doc function
   _doc = (db: any, path: string, id: string) => ({ type: 'doc', path, id });
 
+  // Implement mock getDoc function
+  _getDoc = async (docRef: any) => {
+      const key = `ft_db_doc_${docRef.path}_${docRef.id}`;
+      const data = safeStorage.getItem(key);
+      await new Promise(r => setTimeout(r, 400));
+      return {
+          exists: () => !!data,
+          data: () => data ? JSON.parse(data) : undefined,
+          id: docRef.id
+      };
+  };
+
+  // Implement mock setDoc function
+  _setDoc = async (docRef: any, data: any) => {
+      const key = `ft_db_doc_${docRef.path}_${docRef.id}`;
+      safeStorage.setItem(key, JSON.stringify(data));
+      await new Promise(r => setTimeout(r, 400));
+  };
+
   // Implement mock updateDoc function
   _updateDoc = async (docRef: any, data: any) => {
-      const path = docRef.path;
-      const key = `ft_db_${path}`;
-      let existing = JSON.parse(safeStorage.getItem(key) || '[]');
-      const index = existing.findIndex((d: any) => d.id === docRef.id);
-      if (index !== -1) {
-          existing[index] = { ...existing[index], ...data };
-          safeStorage.setItem(key, JSON.stringify(existing));
-      }
+      const key = `ft_db_doc_${docRef.path}_${docRef.id}`;
+      const existing = safeStorage.getItem(key);
+      const updated = existing ? { ...JSON.parse(existing), ...data } : data;
+      safeStorage.setItem(key, JSON.stringify(updated));
       await new Promise(r => setTimeout(r, 400));
   };
 
@@ -243,15 +264,17 @@ function initMockMode() {
 }
 
 // Export the unified interface
-export { 
-  auth, 
-  db, 
-  _signInWithGoogle as signInWithGoogle, 
-  _logout as logout, 
+export {
+  auth,
+  db,
+  _signInWithGoogle as signInWithGoogle,
+  _logout as logout,
   _onAuthStateChanged as onAuthStateChanged,
   _collection as collection,
   _addDoc as addDoc,
   _getDocs as getDocs,
+  _getDoc as getDoc,
+  _setDoc as setDoc,
   _updateDoc as updateDoc,
   _doc as doc,
   _query as query,

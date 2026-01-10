@@ -1,7 +1,9 @@
 
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import Header from './components/Header';
-import MatchCard from './components/MatchCard';
+import EnhancedMatchCard from './components/EnhancedMatchCard';
+import EnhancedPlayerCard from './components/EnhancedPlayerCard';
+import LoadingSkeleton from './components/LoadingSkeleton';
 import Toast from './components/Toast';
 import { useToast } from './hooks/useToast';
 
@@ -10,6 +12,7 @@ const EntityProfile = lazy(() => import('./components/EntityProfile'));
 const UserProfile = lazy(() => import('./components/UserProfile'));
 const LeagueDashboard = lazy(() => import('./components/LeagueDashboard'));
 const About = lazy(() => import('./components/About'));
+const TeamProfile = lazy(() => import('./components/TeamProfile'));
 import { INITIAL_LIVE_MATCHES, INITIAL_EXCITING_MATCHES, INITIAL_HIGHEST_SCORING_MATCHES, getGenericImage } from './constants';
 import {
   searchEntities,
@@ -20,6 +23,14 @@ import {
   getExcitingPlayers
 } from './services/footballService';
 import { getHybridLiveMatches } from './services/hybridFootballService';
+import { fetchTodaysFixtures, fetchLiveFixtures } from './services/apiFootballService';
+import { getEnrichedLineups, extractFixtureId } from './services/lineupService';
+import {
+  getExcitingMatchesFromAPI,
+  getHighestScoringMatchesFromAPI,
+  getTopPlayersFromAPI,
+  searchFromAPI
+} from './services/apiFootballEnhanced';
 import {
   auth,
   signInWithGoogle,
@@ -36,8 +47,9 @@ import {
   doc
 } from './services/firebase';
 import { User, Entity, Review, League, Match, LeagueMetric, Playlist } from './types';
-import { Loader2, Plus, RefreshCw, Filter, Flame, TrendingUp, AlertCircle, X, ListPlus, Users } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, Filter, Flame, TrendingUp, AlertCircle, X, ListPlus, Users, Star } from 'lucide-react';
 import { getCachedData, setCachedData } from './services/cacheService';
+import { getUserFavorites, addFavoriteTeam, removeFavoriteTeam, UserFavorites } from './services/favoritesService';
 
 const App: React.FC = () => {
   const { toasts, removeToast, success, error: showError, info } = useToast();
@@ -45,7 +57,11 @@ const App: React.FC = () => {
   const [currentLeague, setCurrentLeague] = useState<League | null>(null);
   const [dateFilter, setDateFilter] = useState<'all' | 'today'>('all');
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'HOME' | 'SEARCH' | 'DETAILS' | 'PROFILE' | 'LEAGUES' | 'ABOUT'>('HOME');
+  const [view, setView] = useState<'HOME' | 'SEARCH' | 'DETAILS' | 'PROFILE' | 'LEAGUES' | 'ABOUT' | 'TEAM'>('HOME');
+  const [selectedTeam, setSelectedTeam] = useState<{ name: string; league?: string } | null>(null);
+  const [previousView, setPreviousView] = useState<typeof view>('HOME');
+  const [favorites, setFavorites] = useState<UserFavorites>({ teams: [], players: [], leagues: [] });
+  const [favoriteMatches, setFavoriteMatches] = useState<Match[]>([]);
 
   // URL routing - sync view with URL
   useEffect(() => {
@@ -123,7 +139,7 @@ const App: React.FC = () => {
   const [playlistMatchId, setPlaylistMatchId] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: any) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: any) => {
       if (firebaseUser) {
         const u = {
           id: firebaseUser.uid,
@@ -134,9 +150,14 @@ const App: React.FC = () => {
         };
         setUser(u);
         fetchPlaylists(firebaseUser.uid);
+
+        // Load user favorites
+        const userFavorites = await getUserFavorites(firebaseUser.uid);
+        setFavorites(userFavorites);
       } else {
         setUser(null);
         setPlaylists([]);
+        setFavorites({ teams: [], players: [], leagues: [] });
       }
     });
     return () => unsubscribe();
@@ -220,21 +241,36 @@ const App: React.FC = () => {
   const fetchLive = useCallback(async (forceRefresh: boolean = false) => {
     setIsRefreshing(true);
     try {
-        // If forcing refresh, clear cache first
+        // If forcing refresh, clear all caches
         if (forceRefresh) {
           const cacheKey = `live_v2_${currentLeague || 'all'}`;
           const hybridCacheKey = `hybrid_live_${new Date().toISOString().split('T')[0]}_${currentLeague || 'all'}`;
+          const apiFootballCacheKey = `apif_today_${new Date().toISOString().split('T')[0]}`;
           localStorage.removeItem(cacheKey);
           localStorage.removeItem(hybridCacheKey);
+          localStorage.removeItem(apiFootballCacheKey);
         }
 
-        // Try hybrid mode first (real API + AI analysis)
-        // If Football Data API key is not set or fails, falls back to AI-only mode
-        let liveData = await getHybridLiveMatches(currentLeague || undefined);
+        let liveData: Match[] = [];
 
-        // If hybrid returns no data, fall back to AI-only mode
+        // TIER 1: Try API-Football first (best real-time coverage)
+        console.log('🏆 Tier 1: Trying API-Football (RapidAPI)...');
+        liveData = await fetchTodaysFixtures();
+
+        // Filter by league if specified
+        if (liveData.length > 0 && currentLeague) {
+          liveData = liveData.filter(m => m.league === currentLeague);
+        }
+
+        // TIER 2: If API-Football fails, try football-data.org hybrid
         if (liveData.length === 0) {
-          console.log('🔄 Hybrid mode returned no data, falling back to AI-only mode');
+          console.log('🥈 Tier 2: Trying football-data.org hybrid...');
+          liveData = await getHybridLiveMatches(currentLeague || undefined);
+        }
+
+        // TIER 3: If both APIs fail, fall back to AI-only mode
+        if (liveData.length === 0) {
+          console.log('🥉 Tier 3: Falling back to AI-only mode...');
           liveData = await getLiveMatches(currentLeague || undefined);
         }
 
@@ -244,6 +280,7 @@ const App: React.FC = () => {
           success('Matches refreshed!');
         }
     } catch (err: any) {
+      console.error('❌ All data sources failed:', err);
       setFeaturedMatches(INITIAL_LIVE_MATCHES);
       if (forceRefresh) {
         showError('Failed to refresh matches');
@@ -275,38 +312,160 @@ const App: React.FC = () => {
     // Stage 1: Load cached live matches immediately
     fetchLive(false);
 
-    // Stage 2: Load other matches progressively
-    setTimeout(() => {
-      getExcitingMatches().then(setExcitingMatches);
+    // Stage 2: Load other matches progressively (API-first with Gemini fallback)
+    setTimeout(async () => {
+      try {
+        console.log('🎯 Fetching exciting matches from API...');
+        let exciting = await getExcitingMatchesFromAPI();
+
+        // Fallback to Gemini if API fails
+        if (exciting.length === 0) {
+          console.log('🤖 API returned no data, falling back to Gemini...');
+          exciting = await getExcitingMatches();
+        }
+
+        setExcitingMatches(exciting);
+      } catch (err) {
+        console.error('Failed to load exciting matches:', err);
+        setExcitingMatches(await getExcitingMatches());
+      }
     }, 100);
 
-    setTimeout(() => {
-      getHighestScoringMatches().then(setHighestScoringMatches);
+    setTimeout(async () => {
+      try {
+        console.log('🎯 Fetching highest scoring matches from API...');
+        let highScoring = await getHighestScoringMatchesFromAPI();
+
+        // Fallback to Gemini if API fails
+        if (highScoring.length === 0) {
+          console.log('🤖 API returned no data, falling back to Gemini...');
+          highScoring = await getHighestScoringMatches();
+        }
+
+        setHighestScoringMatches(highScoring);
+      } catch (err) {
+        console.error('Failed to load highest scoring matches:', err);
+        setHighestScoringMatches(await getHighestScoringMatches());
+      }
     }, 200);
 
-    // Stage 3: Load exciting players
-    setTimeout(() => {
-      getExcitingPlayers().then(setExcitingPlayers);
+    // Stage 3: Load exciting players (API-first with Gemini fallback)
+    setTimeout(async () => {
+      try {
+        console.log('🎯 Fetching top players from API...');
+        let players = await getTopPlayersFromAPI();
+
+        // Fallback to Gemini if API fails
+        if (players.length === 0) {
+          console.log('🤖 API returned no data, falling back to Gemini...');
+          players = await getExcitingPlayers();
+        }
+
+        setExcitingPlayers(players);
+      } catch (err) {
+        console.error('Failed to load top players:', err);
+        setExcitingPlayers(await getExcitingPlayers());
+      }
     }, 300);
 
-    // Stage 4: Auto-refresh in background every 5 minutes (reduced from 10)
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing matches in background...');
-      fetchLive(false); // Don't show toast for auto-refresh
-    }, 300000); // 5 minutes
+    // Stage 4: Real-time live match updates (like SofaScore)
+    // Check for live matches every 30 seconds
+    const liveInterval = setInterval(async () => {
+      console.log('⚽ Checking for live match updates...');
 
-    return () => clearInterval(interval);
+      try {
+        // Fetch only live fixtures from API-Football
+        const liveMatches = await fetchLiveFixtures();
+
+        if (liveMatches.length > 0) {
+          // Update featured matches with latest live data
+          setFeaturedMatches(prev => {
+            const nonLiveMatches = prev.filter(m => m.status !== 'LIVE');
+            return [...liveMatches, ...nonLiveMatches];
+          });
+          console.log(`✅ Updated ${liveMatches.length} live matches`);
+        }
+      } catch (error) {
+        console.error('Failed to update live matches:', error);
+      }
+    }, 30000); // 30 seconds for live matches
+
+    // Stage 5: Full refresh every 3 minutes for non-live matches
+    const fullRefreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing all matches in background...');
+      fetchLive(false); // Don't show toast for auto-refresh
+    }, 180000); // 3 minutes
+
+    return () => {
+      clearInterval(liveInterval);
+      clearInterval(fullRefreshInterval);
+    };
   }, [currentLeague]); // Re-fetch when league changes
 
   const handleSearch = useCallback(async (query: string) => {
     setIsLoading(true); setView('SEARCH');
-    try { setSearchResults(await searchEntities(query)); } catch (err) { setSearchResults([]); }
+    try {
+      console.log(`🔍 Searching API for "${query}"...`);
+      let results = await searchFromAPI(query);
+
+      // Fallback to Gemini if API returns no results
+      if (results.length === 0) {
+        console.log('🤖 No API results, falling back to Gemini search...');
+        results = await searchEntities(query);
+      }
+
+      setSearchResults(results);
+    } catch (err) {
+      console.error('Search failed:', err);
+      setSearchResults(await searchEntities(query)); // Fallback to Gemini
+    }
     finally { setIsLoading(false); }
   }, []);
 
-  const handleEntityClick = useCallback((entity: Entity) => {
+  const handleEntityClick = useCallback(async (entity: Entity) => {
     setSelectedEntity(entity); setView('DETAILS');
     window.scrollTo(0, 0); fetchReviews(entity.id);
+
+    // If it's a match from API-Football, fetch real or predicted lineups
+    if (entity.type === 'MATCH' && entity.id.startsWith('apif_')) {
+      const fixtureId = extractFixtureId(entity.id);
+
+      if (fixtureId && 'homeTeam' in entity && 'awayTeam' in entity) {
+        try {
+          console.log(`📋 Fetching lineups for ${entity.homeTeam} vs ${entity.awayTeam}...`);
+          const lineupData = await getEnrichedLineups(
+            fixtureId,
+            entity.homeTeam,
+            entity.awayTeam,
+            'league' in entity ? entity.league : undefined
+          );
+
+          if (lineupData) {
+            // Update the selected entity with lineups (real or predicted)
+            setSelectedEntity(prev => prev ? {
+              ...prev,
+              lineups: {
+                home: lineupData.home,
+                away: lineupData.away
+              },
+              bench: lineupData.bench,
+              formation: {
+                home: lineupData.homeFormation,
+                away: lineupData.awayFormation
+              },
+              isPredictedLineup: lineupData.isPredicted,
+              lineupConfidence: lineupData.confidence,
+              lineupWatchability: lineupData.lineupWatchability
+            } as Entity : null);
+
+            const type = lineupData.isPredicted ? 'Predicted' : 'Actual';
+            console.log(`✅ ${type} lineups loaded (watchability: ${lineupData.lineupWatchability?.toFixed(1)})`);
+          }
+        } catch (error) {
+          console.error('❌ Failed to fetch lineups:', error);
+        }
+      }
+    }
   }, [fetchReviews]);
 
   const handlePlaylistClick = useCallback((matchId: string) => {
@@ -343,6 +502,18 @@ const App: React.FC = () => {
     setCurrentLeague(null);
     updateUrl('HOME');
   }, [updateUrl]);
+
+  const handleGoBack = useCallback(() => {
+    setView(previousView);
+    window.scrollTo(0, 0);
+  }, [previousView]);
+
+  const handleTeamClick = useCallback((teamName: string, league?: string) => {
+    setPreviousView(view);
+    setSelectedTeam({ name: teamName, league });
+    setView('TEAM');
+    updateUrl('TEAM', { team: teamName });
+  }, [view, updateUrl]);
 
   const handleProfileClick = useCallback((u: User) => {
     setProfileUser(u);
@@ -406,6 +577,35 @@ const App: React.FC = () => {
     updateUrl('HOME', { league: l });
   }, [updateUrl]);
 
+  const handleToggleFavoriteTeam = useCallback(async (teamName: string) => {
+    if (!user) {
+      showError('Please login to add favorites');
+      return;
+    }
+
+    try {
+      const isFavorited = favorites.teams.includes(teamName);
+
+      if (isFavorited) {
+        await removeFavoriteTeam(user.id, teamName);
+        setFavorites(prev => ({
+          ...prev,
+          teams: prev.teams.filter(t => t !== teamName)
+        }));
+        success(`Removed ${teamName} from favorites`);
+      } else {
+        await addFavoriteTeam(user.id, teamName);
+        setFavorites(prev => ({
+          ...prev,
+          teams: [...prev.teams, teamName]
+        }));
+        success(`Added ${teamName} to favorites`);
+      }
+    } catch (error: any) {
+      showError(`Failed to update favorites: ${error.message}`);
+    }
+  }, [user, favorites, success, showError]);
+
   // Filter matches by league and date
   const filteredFeaturedMatches = useMemo(() => {
     let matches = featuredMatches;
@@ -438,6 +638,20 @@ const App: React.FC = () => {
       ? highestScoringMatches.filter(m => m.league === currentLeague)
       : highestScoringMatches;
   }, [highestScoringMatches, currentLeague]);
+
+  // Filter matches featuring favorite teams
+  const filteredFavoriteMatches = useMemo(() => {
+    if (favorites.teams.length === 0) return [];
+
+    const allMatches = [...featuredMatches, ...excitingMatches, ...highestScoringMatches];
+    const uniqueMatches = Array.from(new Map(allMatches.map(m => [m.id, m])).values());
+
+    return uniqueMatches.filter(match =>
+      favorites.teams.some(team =>
+        match.homeTeam === team || match.awayTeam === team
+      )
+    ).slice(0, 8); // Limit to 8 matches
+  }, [featuredMatches, excitingMatches, highestScoringMatches, favorites.teams]);
 
   return (
     <div className="min-h-screen bg-dark-900 font-sans text-gray-100 relative">
@@ -511,6 +725,21 @@ const App: React.FC = () => {
                 </section>
               )}
 
+              {/* Favorite Teams Section */}
+              {user && filteredFavoriteMatches.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-6 border-l-4 border-yellow-500 pl-4">
+                    <h2 className="text-xl font-bold text-white uppercase tracking-widest">My Favorite Teams</h2>
+                    <Star size={18} className="text-yellow-500 fill-yellow-500" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {filteredFavoriteMatches.map(m => (
+                      <EnhancedMatchCard key={m.id} match={m} onClick={() => handleEntityClick(m)} />
+                    ))}
+                  </div>
+                </section>
+              )}
+
               <section>
                 <div className="flex justify-between items-center mb-6 border-l-4 border-pitch-500 pl-4">
                   <h2 className="text-xl font-bold text-white uppercase tracking-widest">
@@ -527,9 +756,11 @@ const App: React.FC = () => {
                   </button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                   {filteredFeaturedMatches.length > 0 ? filteredFeaturedMatches.map(m => (
+                   {isRefreshing && filteredFeaturedMatches.length === 0 ? (
+                     <LoadingSkeleton type="match" count={4} />
+                   ) : filteredFeaturedMatches.length > 0 ? filteredFeaturedMatches.map(m => (
                      <div key={m.id} className="relative group">
-                        <MatchCard match={m} onClick={() => handleEntityClick(m)} />
+                        <EnhancedMatchCard match={m} onClick={() => handleEntityClick(m)} />
                         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition z-10">
                            <button onClick={(e) => { e.stopPropagation(); setModalEntity(m); setIsModalOpen(true); }} className="p-1.5 bg-black/60 rounded-full text-white hover:bg-pitch-600"><Plus size={14}/></button>
                            <button onClick={(e) => { e.stopPropagation(); handlePlaylistClick(m.id); }} className="p-1.5 bg-black/60 rounded-full text-white hover:bg-blue-600"><ListPlus size={14}/></button>
@@ -549,7 +780,9 @@ const App: React.FC = () => {
                    <Flame size={18} className="text-orange-500" />
                  </div>
                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {filteredExcitingMatches.length > 0 ? filteredExcitingMatches.map(m => <MatchCard key={m.id} match={m} onClick={() => handleEntityClick(m)} />) : (
+                    {isLoading && filteredExcitingMatches.length === 0 ? (
+                      <LoadingSkeleton type="match" count={4} />
+                    ) : filteredExcitingMatches.length > 0 ? filteredExcitingMatches.map(m => <EnhancedMatchCard key={m.id} match={m} onClick={() => handleEntityClick(m)} />) : (
                       <div className="col-span-full text-center py-12 text-gray-500">
                         No exciting matches found for {currentLeague}.
                       </div>
@@ -565,30 +798,11 @@ const App: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
                     {excitingPlayers.map(player => (
-                      <div
+                      <EnhancedPlayerCard
                         key={player.id}
-                        onClick={() => handleEntityClick(player)}
-                        className="cursor-pointer group bg-dark-800 rounded-lg p-4 border border-dark-700 hover:border-yellow-500 transition"
-                      >
-                        <div className="aspect-square rounded-full overflow-hidden mb-3 bg-dark-700">
-                          <img src={player.image} alt={player.name} className="w-full h-full object-cover" />
-                        </div>
-                        <div className="text-center">
-                          <div className="text-sm font-bold text-white truncate mb-1">{player.name}</div>
-                          <div className="text-xs text-gray-400 truncate mb-2">{player.subtitle}</div>
-                          {typeof player.stats === 'object' && 'goals' in player.stats && (
-                            <div className="flex justify-center gap-3 text-xs">
-                              <div className="text-pitch-400 font-bold">{player.stats.goals}G</div>
-                              <div className="text-blue-400 font-bold">{player.stats.assists}A</div>
-                            </div>
-                          )}
-                          {player.rating && (
-                            <div className="mt-2 px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/50 rounded text-xs font-bold text-yellow-300 inline-block">
-                              {player.rating.toFixed(1)} ⭐
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                        player={player}
+                        onClick={handleEntityClick}
+                      />
                     ))}
                   </div>
                 </section>
@@ -629,6 +843,7 @@ const App: React.FC = () => {
                 reviews={reviews}
                 onRate={handleOpenReviewModal}
                 onAddToPlaylist={handlePlaylistClick}
+                onTeamClick={handleTeamClick}
              />
            </Suspense>
          )}
@@ -663,6 +878,20 @@ const App: React.FC = () => {
          {view === 'ABOUT' && (
            <Suspense fallback={<div className="flex justify-center items-center py-20"><Loader2 className="animate-spin text-pitch-500" size={40} /></div>}>
              <About />
+           </Suspense>
+         )}
+
+         {view === 'TEAM' && selectedTeam && (
+           <Suspense fallback={<div className="flex justify-center items-center py-20"><Loader2 className="animate-spin text-pitch-500" size={40} /></div>}>
+             <TeamProfile
+               teamName={selectedTeam.name}
+               league={selectedTeam.league}
+               onBack={handleGoBack}
+               onMatchClick={handleEntityClick}
+               onPlayerClick={handleEntityClick}
+               onToggleFavorite={handleToggleFavoriteTeam}
+               isFavorited={favorites.teams.includes(selectedTeam.name)}
+             />
            </Suspense>
          )}
       </main>

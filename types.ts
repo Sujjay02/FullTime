@@ -103,7 +103,7 @@ export interface Match extends Entity {
   homeTeam: string;
   awayTeam: string;
   score?: string;
-  minute?: string; 
+  minute?: string;
   league: string;
   status?: MatchStatus;
   events?: MatchEvent[];
@@ -121,6 +121,9 @@ export interface Match extends Entity {
     home: LineupPlayer[];
     away: LineupPlayer[];
   };
+  isPredictedLineup?: boolean; // True if lineups are AI-predicted
+  lineupConfidence?: 'high' | 'medium' | 'low'; // Confidence level for predictions
+  lineupWatchability?: number; // Overall lineup quality score 0-10
 }
 
 export interface LeagueMetric {
@@ -133,11 +136,36 @@ export interface LeagueMetric {
 }
 
 export enum League {
+  // Major Leagues
   PREMIER_LEAGUE = 'Premier League',
   LA_LIGA = 'La Liga',
   BUNDESLIGA = 'Bundesliga',
   SERIE_A = 'Serie A',
   LIGUE_1 = 'Ligue 1',
   MLS = 'MLS',
-  CHAMPIONS_LEAGUE = 'Champions League'
+
+  // European Competitions
+  CHAMPIONS_LEAGUE = 'Champions League',
+  EUROPA_LEAGUE = 'Europa League',
+  CONFERENCE_LEAGUE = 'Conference League',
+
+  // England Cups
+  FA_CUP = 'FA Cup',
+  EFL_CUP = 'EFL Cup',
+  COMMUNITY_SHIELD = 'Community Shield',
+
+  // Spain Cups
+  COPA_DEL_REY = 'Copa del Rey',
+  SUPERCOPA_ESPANA = 'Supercopa de España',
+
+  // Germany Cups
+  DFB_POKAL = 'DFB-Pokal',
+
+  // Italy Cups
+  COPPA_ITALIA = 'Coppa Italia',
+  SUPERCOPPA_ITALIANA = 'Supercoppa Italiana',
+
+  // France Cups
+  COUPE_DE_FRANCE = 'Coupe de France',
+  COUPE_DE_LA_LIGUE = 'Coupe de la Ligue'
 }

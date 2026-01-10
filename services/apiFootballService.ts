@@ -100,12 +100,38 @@ interface ApiPlayerStats {
 // Map API league IDs to our League enum
 const mapLeagueIdToLeague = (leagueId: number, leagueName: string): string => {
   const mapping: Record<number, string> = {
-    39: League.PREMIER_LEAGUE,    // Premier League
-    140: League.LA_LIGA,          // La Liga
-    78: League.BUNDESLIGA,        // Bundesliga
-    135: League.SERIE_A,          // Serie A
-    61: League.LIGUE_1,           // Ligue 1
-    2: League.CHAMPIONS_LEAGUE,   // Champions League
+    // Major Leagues
+    39: League.PREMIER_LEAGUE,        // Premier League
+    140: League.LA_LIGA,              // La Liga
+    78: League.BUNDESLIGA,            // Bundesliga
+    135: League.SERIE_A,              // Serie A
+    61: League.LIGUE_1,               // Ligue 1
+    253: League.MLS,                  // MLS
+
+    // European Competitions
+    2: League.CHAMPIONS_LEAGUE,       // Champions League
+    3: League.EUROPA_LEAGUE,          // Europa League
+    848: League.CONFERENCE_LEAGUE,    // Conference League
+
+    // England Cups
+    48: League.FA_CUP,                // FA Cup
+    45: League.COMMUNITY_SHIELD,      // Community Shield
+    46: League.EFL_CUP,               // EFL Cup (Carabao Cup)
+
+    // Spain Cups
+    143: League.COPA_DEL_REY,         // Copa del Rey
+    556: League.SUPERCOPA_ESPANA,     // Supercopa de España
+
+    // Germany Cups
+    81: League.DFB_POKAL,             // DFB-Pokal
+
+    // Italy Cups
+    137: League.COPPA_ITALIA,         // Coppa Italia
+    547: League.SUPERCOPPA_ITALIANA,  // Supercoppa Italiana
+
+    // France Cups
+    66: League.COUPE_DE_FRANCE,       // Coupe de France
+    65: League.COUPE_DE_LA_LIGUE,     // Coupe de la Ligue
   };
   return mapping[leagueId] || leagueName;
 };
@@ -137,9 +163,27 @@ export const fetchTodaysFixtures = async (): Promise<Match[]> => {
     return [];
   }
 
-  try {
-    const today = new Date().toISOString().split('T')[0];
+  // Check cache first (cache for 2 minutes to save API calls)
+  const today = new Date().toISOString().split('T')[0];
+  const cacheKey = `apif_today_${today}`;
+  const cached = localStorage.getItem(cacheKey);
 
+  if (cached) {
+    try {
+      const { data, timestamp } = JSON.parse(cached);
+      const age = Date.now() - timestamp;
+
+      // Cache valid for 2 minutes (120000ms)
+      if (age < 120000) {
+        console.log('✅ Using cached API-Football data');
+        return data;
+      }
+    } catch (e) {
+      localStorage.removeItem(cacheKey);
+    }
+  }
+
+  try {
     const response = await fetch(`${API_BASE_URL}/fixtures?date=${today}`, {
       headers: {
         'x-rapidapi-key': API_KEY,
@@ -155,12 +199,19 @@ export const fetchTodaysFixtures = async (): Promise<Match[]> => {
     const data = await response.json();
     const fixtures: ApiFixture[] = data.response || [];
 
-    // Filter to major leagues and convert
-    const majorLeagueIds = [39, 140, 78, 135, 61, 2]; // PL, La Liga, Bundesliga, Serie A, Ligue 1, UCL
+    // Include major leagues AND cup competitions
+    const includedLeagueIds = [
+      // Major Leagues
+      39, 140, 78, 135, 61, 253,
+      // European Competitions
+      2, 3, 848,
+      // Cup Competitions
+      48, 45, 46, 143, 556, 81, 137, 547, 66, 65
+    ];
 
     const matches: Match[] = fixtures
-      .filter(f => majorLeagueIds.includes(f.league.id))
-      .slice(0, 20) // Get more matches
+      .filter(f => includedLeagueIds.includes(f.league.id))
+      .slice(0, 30) // Get more matches to include cups
       .map((fixture) => {
         const homeScore = fixture.goals.home ?? 0;
         const awayScore = fixture.goals.away ?? 0;
@@ -201,6 +252,12 @@ export const fetchTodaysFixtures = async (): Promise<Match[]> => {
         };
       });
 
+    // Cache the results
+    localStorage.setItem(cacheKey, JSON.stringify({
+      data: matches,
+      timestamp: Date.now()
+    }));
+
     console.log(`✅ API-Football: Fetched ${matches.length} fixtures`);
     return matches;
   } catch (error) {
@@ -215,6 +272,24 @@ export const fetchTodaysFixtures = async (): Promise<Match[]> => {
 export const fetchLiveFixtures = async (): Promise<Match[]> => {
   if (!API_KEY) return [];
 
+  // Cache live matches for 30 seconds (shorter cache for real-time updates)
+  const cacheKey = 'apif_live_matches';
+  const cached = localStorage.getItem(cacheKey);
+
+  if (cached) {
+    try {
+      const { data, timestamp } = JSON.parse(cached);
+      const age = Date.now() - timestamp;
+
+      // Cache valid for 30 seconds only
+      if (age < 30000) {
+        return data;
+      }
+    } catch (e) {
+      localStorage.removeItem(cacheKey);
+    }
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}/fixtures?live=all`, {
       headers: {
@@ -228,8 +303,12 @@ export const fetchLiveFixtures = async (): Promise<Match[]> => {
     const data = await response.json();
     const fixtures: ApiFixture[] = data.response || [];
 
-    // Filter to major leagues
-    const majorLeagueIds = [39, 140, 78, 135, 61, 2];
+    // Filter to major leagues and cups
+    const majorLeagueIds = [
+      39, 140, 78, 135, 61, 253,  // Leagues
+      2, 3, 848,                   // European
+      48, 45, 46, 143, 556, 81, 137, 547, 66, 65  // Cups
+    ];
 
     const liveMatches: Match[] = fixtures
       .filter(f => majorLeagueIds.includes(f.league.id))
@@ -259,6 +338,12 @@ export const fetchLiveFixtures = async (): Promise<Match[]> => {
         };
       });
 
+    // Cache the live matches
+    localStorage.setItem(cacheKey, JSON.stringify({
+      data: liveMatches,
+      timestamp: Date.now()
+    }));
+
     console.log(`✅ API-Football: Found ${liveMatches.length} live matches`);
     return liveMatches;
   } catch (error) {
@@ -270,7 +355,12 @@ export const fetchLiveFixtures = async (): Promise<Match[]> => {
 /**
  * Fetch detailed lineup for a specific match
  */
-export const fetchMatchLineups = async (fixtureId: number): Promise<{ home: LineupPlayer[]; away: LineupPlayer[] } | null> => {
+export const fetchMatchLineups = async (fixtureId: number): Promise<{
+  home: LineupPlayer[];
+  away: LineupPlayer[];
+  bench?: { home: LineupPlayer[]; away: LineupPlayer[] };
+  formation?: { home: string; away: string };
+} | null> => {
   if (!API_KEY) return null;
 
   try {
@@ -302,9 +392,28 @@ export const fetchMatchLineups = async (fixtureId: number): Promise<{ home: Line
       }));
     };
 
+    const convertBench = (lineup: ApiLineup): LineupPlayer[] => {
+      return lineup.substitutes.map(p => ({
+        name: p.player.name,
+        number: p.player.number,
+        position: p.player.pos,
+        goals: 0,
+        assists: 0,
+        watchability: 6.0
+      }));
+    };
+
     return {
       home: convertLineup(homeLineup),
-      away: convertLineup(awayLineup)
+      away: convertLineup(awayLineup),
+      bench: {
+        home: convertBench(homeLineup),
+        away: convertBench(awayLineup)
+      },
+      formation: {
+        home: homeLineup.formation || '4-3-3',
+        away: awayLineup.formation || '4-3-3'
+      }
     };
   } catch (error) {
     console.error('❌ Lineup fetch error:', error);

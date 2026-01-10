@@ -10,6 +10,7 @@ interface EntityProfileProps {
   onRate: (e: React.MouseEvent) => void;
   onUserClick?: (user: User) => void;
   onAddToPlaylist?: (matchId: string) => void;
+  onTeamClick?: (teamName: string, league?: string) => void;
 }
 
 const getEventIcon = (type: string, detail?: string) => {
@@ -74,7 +75,7 @@ const LineupGroup = ({ title, players, isHome }: { title: string, players: Lineu
   );
 };
 
-const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate, onUserClick, onAddToPlaylist }) => {
+const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate, onUserClick, onAddToPlaylist, onTeamClick }) => {
   const match = entity.type === 'MATCH' ? (entity as Match) : null;
   const isUpcoming = match?.status === 'UPCOMING';
   const isLive = match?.status === 'LIVE' || match?.status === 'HT';
@@ -383,7 +384,14 @@ const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate, 
                    <div className="bg-pitch-900/20 border border-pitch-600/30 rounded-xl p-8 relative overflow-hidden min-h-[500px]">
                       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/grass.png')] opacity-5"></div>
                       <div className="relative z-10">
-                        <h4 className="text-pitch-400 font-black text-sm uppercase tracking-widest mb-8 border-b border-pitch-600/20 pb-2">{match.homeTeam} XI</h4>
+                        <h4 className="text-pitch-400 font-black text-sm uppercase tracking-widest mb-8 border-b border-pitch-600/20 pb-2 flex items-center justify-between">
+                          <button
+                            onClick={() => onTeamClick?.(match.homeTeam, match.league)}
+                            className="hover:text-pitch-300 transition-colors cursor-pointer underline decoration-dotted decoration-pitch-600/50 hover:decoration-pitch-300"
+                          >
+                            {match.homeTeam} XI
+                          </button>
+                        </h4>
                         {(() => {
                            const grouped = groupPlayers(match.lineups?.home || []);
                            return (
@@ -415,7 +423,14 @@ const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate, 
                    <div className="bg-blue-900/10 border border-blue-600/30 rounded-xl p-8 relative overflow-hidden min-h-[500px]">
                       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/grass.png')] opacity-5"></div>
                       <div className="relative z-10 text-right">
-                        <h4 className="text-blue-400 font-black text-sm uppercase tracking-widest mb-8 border-b border-blue-600/20 pb-2">{match.awayTeam} XI</h4>
+                        <h4 className="text-blue-400 font-black text-sm uppercase tracking-widest mb-8 border-b border-blue-600/20 pb-2 flex items-center justify-between">
+                          <button
+                            onClick={() => onTeamClick?.(match.awayTeam, match.league)}
+                            className="hover:text-blue-300 transition-colors cursor-pointer underline decoration-dotted decoration-blue-600/50 hover:decoration-blue-300 ml-auto"
+                          >
+                            {match.awayTeam} XI
+                          </button>
+                        </h4>
                         {(() => {
                            const grouped = groupPlayers(match.lineups?.away || []);
                            return (

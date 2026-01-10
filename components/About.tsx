@@ -1,21 +1,79 @@
 
 import React from 'react';
-import { TrendingUp, Zap, Target, Brain, Sparkles, BarChart3, Trophy, Clock } from 'lucide-react';
+import { TrendingUp, Zap, Target, Brain, Sparkles, BarChart3, Trophy, Clock, Star, Users, Search, Shield } from 'lucide-react';
 
 const About: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 py-12 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Hero Section */}
       <div className="text-center mb-16">
-        <div className="inline-block px-4 py-2 bg-pitch-600/20 border border-pitch-500/50 rounded-full text-sm font-bold text-pitch-300 uppercase tracking-wider mb-6">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pitch-600/20 to-orange-600/20 border border-pitch-500/50 rounded-full text-sm font-bold text-pitch-300 uppercase tracking-wider mb-6">
+          <Sparkles size={16} className="text-orange-400" />
           About FullTime
+          <span className="px-2 py-0.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-full text-[10px]">Beta</span>
         </div>
         <h1 className="text-4xl md:text-5xl font-black text-white mb-4">
-          Never Miss a <span className="text-pitch-400">Legendary</span> Match
+          Never Miss a <span className="bg-gradient-to-r from-pitch-400 to-orange-400 bg-clip-text text-transparent">Legendary</span> Match
         </h1>
         <p className="text-xl text-gray-300 leading-relaxed max-w-2xl mx-auto">
-          AI-powered football match discovery that helps you find the most entertaining games worth watching.
+          AI-powered football match discovery that helps you find the most entertaining games worth watching, explore teams, and follow your favorites.
         </p>
+      </div>
+
+      {/* Key Features Section */}
+      <div className="mb-12">
+        <h2 className="text-3xl font-black text-white mb-8 text-center">
+          Powerful Features
+        </h2>
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="bg-gradient-to-br from-pitch-900/40 to-dark-800 border border-pitch-700/50 rounded-xl p-6 hover:border-pitch-500/50 transition-all duration-300">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-pitch-600/20 rounded-lg">
+                <Star className="text-yellow-400" size={24} />
+              </div>
+              <h3 className="text-xl font-black text-white">Favorite Teams</h3>
+            </div>
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Save your favorite teams and get a personalized feed of matches featuring them. Never miss when your teams are playing.
+            </p>
+          </div>
+
+          <div className="bg-gradient-to-br from-blue-900/40 to-dark-800 border border-blue-700/50 rounded-xl p-6 hover:border-blue-500/50 transition-all duration-300">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-blue-600/20 rounded-lg">
+                <Users className="text-blue-400" size={24} />
+              </div>
+              <h3 className="text-xl font-black text-white">Team Profiles</h3>
+            </div>
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Explore comprehensive team pages with current squad, recent matches, manager info, formations, and team quality ratings.
+            </p>
+          </div>
+
+          <div className="bg-gradient-to-br from-purple-900/40 to-dark-800 border border-purple-700/50 rounded-xl p-6 hover:border-purple-500/50 transition-all duration-300">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-purple-600/20 rounded-lg">
+                <Shield className="text-purple-400" size={24} />
+              </div>
+              <h3 className="text-xl font-black text-white">AI Predicted Lineups</h3>
+            </div>
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Get AI-generated predicted starting XIs when official lineups aren't available yet, with confidence ratings and watchability scores.
+            </p>
+          </div>
+
+          <div className="bg-gradient-to-br from-orange-900/40 to-dark-800 border border-orange-700/50 rounded-xl p-6 hover:border-orange-500/50 transition-all duration-300">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-orange-600/20 rounded-lg">
+                <Search className="text-orange-400" size={24} />
+              </div>
+              <h3 className="text-xl font-black text-white">Smart Discovery</h3>
+            </div>
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Find matches by league, team, or player. AI-powered search understands context and delivers the most relevant results.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Watchability Score Section */}
@@ -178,35 +236,95 @@ const About: React.FC = () => {
         </div>
       </div>
 
-      {/* Features */}
-      <div className="grid md:grid-cols-2 gap-6 mb-12">
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
-          <Clock className="text-pitch-400 mb-4" size={32} />
-          <h3 className="text-xl font-black text-white mb-2">Real-Time Updates</h3>
+      {/* How It Works */}
+      <div className="bg-gradient-to-br from-dark-800 to-dark-900 border border-dark-700 rounded-xl p-8 mb-12">
+        <h2 className="text-2xl font-black text-white mb-6 text-center">How It Works</h2>
+        <div className="grid md:grid-cols-3 gap-8">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-pitch-600/20 rounded-full mb-4">
+              <span className="text-2xl font-black text-pitch-400">1</span>
+            </div>
+            <h3 className="font-bold text-white mb-2">Browse Matches</h3>
+            <p className="text-sm text-gray-400">
+              Explore live, upcoming, and recent matches from top leagues worldwide
+            </p>
+          </div>
+
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-600/20 rounded-full mb-4">
+              <span className="text-2xl font-black text-orange-400">2</span>
+            </div>
+            <h3 className="font-bold text-white mb-2">Check Watchability</h3>
+            <p className="text-sm text-gray-400">
+              See AI-powered ratings for match entertainment and quality
+            </p>
+          </div>
+
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600/20 rounded-full mb-4">
+              <span className="text-2xl font-black text-blue-400">3</span>
+            </div>
+            <h3 className="font-bold text-white mb-2">Follow & Track</h3>
+            <p className="text-sm text-gray-400">
+              Save favorites, explore teams, and get personalized recommendations
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Additional Features */}
+      <div className="grid md:grid-cols-3 gap-6 mb-12">
+        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 hover:border-pitch-500/50 transition-all duration-300">
+          <Clock className="text-pitch-400 mb-4" size={28} />
+          <h3 className="text-lg font-black text-white mb-2">Real-Time Data</h3>
           <p className="text-gray-300 text-sm leading-relaxed">
-            Live match data, scores, and events updated in real-time. Get instant notifications
-            when legendary matches are happening.
+            Live scores, lineups, and match events updated in real-time from trusted sources.
           </p>
         </div>
 
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6">
-          <Brain className="text-pitch-400 mb-4" size={32} />
-          <h3 className="text-xl font-black text-white mb-2">Personalized Recommendations</h3>
+        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 hover:border-pitch-500/50 transition-all duration-300">
+          <Brain className="text-pitch-400 mb-4" size={28} />
+          <h3 className="text-lg font-black text-white mb-2">Smart Insights</h3>
           <p className="text-gray-300 text-sm leading-relaxed">
-            AI learns from your viewing history and preferences to suggest matches you'll love.
-            Never miss games from your favorite teams or leagues.
+            AI-powered analysis of player form, team quality, and tactical matchups.
+          </p>
+        </div>
+
+        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 hover:border-pitch-500/50 transition-all duration-300">
+          <Trophy className="text-pitch-400 mb-4" size={28} />
+          <h3 className="text-lg font-black text-white mb-2">Multi-League</h3>
+          <p className="text-gray-300 text-sm leading-relaxed">
+            Coverage across Premier League, La Liga, Serie A, Bundesliga, and more.
           </p>
         </div>
       </div>
 
       {/* Footer */}
       <div className="text-center pt-8 border-t border-dark-700">
-        <p className="text-gray-400 text-sm">
-          Built with <span className="text-pitch-400">♥</span> using Google Gemini AI, React, and Firebase
+        <div className="inline-flex items-center gap-2 mb-4">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pitch-600 to-green-300 flex items-center justify-center">
+            <span className="font-bold text-dark-900 text-lg">F</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-xl text-white">FullTime</span>
+            <span className="px-2 py-0.5 text-[10px] font-black uppercase bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-full">
+              Beta
+            </span>
+          </div>
+        </div>
+        <p className="text-gray-400 text-sm mb-2">
+          Built with <span className="text-pitch-400">♥</span> using Google Gemini AI, React, TypeScript, and Firebase
         </p>
-        <p className="text-gray-500 text-xs mt-2">
-          All match data is sourced from public football APIs and verified through AI analysis
+        <p className="text-gray-500 text-xs mb-4">
+          Match data from API-Football • AI analysis powered by Gemini 2.0
         </p>
+        <div className="flex items-center justify-center gap-4 text-xs text-gray-500">
+          <span>v1.0.0-beta</span>
+          <span>•</span>
+          <span>© 2026 FullTime</span>
+          <span>•</span>
+          <span>All Rights Reserved</span>
+        </div>
       </div>
     </div>
   );
