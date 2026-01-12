@@ -102,8 +102,8 @@ const calculateWatchability = (match: {
 };
 
 /**
- * Get exciting matches from API-Football
- * Sorted by watchability score
+ * Get exciting matches from past week (finished matches only)
+ * Sorted by watchability score based on actual results
  */
 export const getExcitingMatchesFromAPI = async (): Promise<Match[]> => {
   const cacheKey = 'api_exciting_matches';
@@ -113,8 +113,8 @@ export const getExcitingMatchesFromAPI = async (): Promise<Match[]> => {
     try {
       const { data, timestamp } = JSON.parse(cached);
       const age = Date.now() - timestamp;
-      if (age < 180000) { // 3 minutes cache
-        console.log('✅ Using cached exciting matches');
+      if (age < 1800000) { // 30 minutes cache for historical data
+        console.log('✅ Using cached exciting matches (past week highlights)');
         return data;
       }
     } catch (e) {
@@ -122,50 +122,97 @@ export const getExcitingMatchesFromAPI = async (): Promise<Match[]> => {
     }
   }
 
+  if (!API_KEY) {
+    console.warn('⚠️ No API key for weekly highlights');
+    return [];
+  }
+
   try {
-    // Get today's fixtures
-    const allMatches = await fetchTodaysFixtures();
+    // Fetch matches from the past 7 days across major leagues
+    const topLeagues = [
+      39,   // Premier League
+      140,  // La Liga
+      78,   // Bundesliga
+      135,  // Serie A
+      61,   // Ligue 1
+      2,    // Champions League
+      3     // Europa League
+    ];
 
-    // Calculate watchability and sort
-    const matchesWithScores = allMatches.map(match => {
-      const homeScore = parseInt(match.score.split('-')[0]) || 0;
-      const awayScore = parseInt(match.score.split('-')[1]) || 0;
-      const leagueIdMap: Record<string, number> = {
-        // Leagues
-        'Premier League': 39, 'La Liga': 140, 'Bundesliga': 78,
-        'Serie A': 135, 'Ligue 1': 61, 'MLS': 253,
-        // European
-        'Champions League': 2, 'Europa League': 3, 'Conference League': 848,
-        // England Cups
-        'FA Cup': 48, 'Community Shield': 45, 'EFL Cup': 46,
-        // Spain Cups
-        'Copa del Rey': 143, 'Supercopa de España': 556,
-        // Germany Cups
-        'DFB-Pokal': 81,
-        // Italy Cups
-        'Coppa Italia': 137, 'Supercoppa Italiana': 547,
-        // France Cups
-        'Coupe de France': 66, 'Coupe de la Ligue': 65
-      };
+    const leagueNames: Record<number, string> = {
+      39: 'Premier League',
+      140: 'La Liga',
+      78: 'Bundesliga',
+      135: 'Serie A',
+      61: 'Ligue 1',
+      2: 'Champions League',
+      3: 'Europa League'
+    };
 
-      const watchability = calculateWatchability({
-        goalsHome: homeScore,
-        goalsAway: awayScore,
-        status: match.status,
-        leagueId: leagueIdMap[match.league] || 0,
-        homeTeam: match.homeTeam,
-        awayTeam: match.awayTeam
-      });
+    const allMatches: Match[] = [];
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
 
-      return {
-        ...match,
-        watchability
-      };
-    });
+    const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
-    // Sort by watchability and take top matches
-    const excitingMatches = matchesWithScores
-      .sort((a, b) => b.watchability - a.watchability)
+    // Fetch finished matches from each league
+    for (const leagueId of topLeagues) {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/fixtures?league=${leagueId}&season=${today.getFullYear()}&from=${formatDate(sevenDaysAgo)}&to=${formatDate(today)}&status=FT`,
+          {
+            headers: {
+              'x-rapidapi-key': API_KEY,
+              'x-rapidapi-host': 'v3.football.api-sports.io'
+            }
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          const fixtures = data.response || [];
+
+          fixtures.forEach((fixture: any) => {
+            const homeScore = fixture.goals.home ?? 0;
+            const awayScore = fixture.goals.away ?? 0;
+            const totalGoals = homeScore + awayScore;
+
+            // Only include matches with at least 2 goals
+            if (totalGoals >= 2) {
+              const watchability = calculateWatchability({
+                goalsHome: homeScore,
+                goalsAway: awayScore,
+                status: 'FT',
+                leagueId: leagueId,
+                homeTeam: fixture.teams.home.name,
+                awayTeam: fixture.teams.away.name
+              });
+
+              allMatches.push({
+                id: `apif_${fixture.fixture.id}`,
+                name: `${fixture.teams.home.name} vs ${fixture.teams.away.name}`,
+                type: 'MATCH' as const,
+                homeTeam: fixture.teams.home.name,
+                awayTeam: fixture.teams.away.name,
+                score: `${homeScore}-${awayScore}`,
+                league: leagueNames[leagueId] || 'League',
+                status: 'FT' as MatchStatus,
+                minute: 'FT',
+                watchability,
+                image: getGenericImage(`apif_${fixture.fixture.id}`)
+              });
+            }
+          });
+        }
+      } catch (err) {
+        console.error(`Failed to fetch from league ${leagueId}:`, err);
+      }
+    }
+
+    // Sort by watchability and take top 8 matches
+    const excitingMatches = allMatches
+      .sort((a, b) => (b.watchability || 0) - (a.watchability || 0))
       .slice(0, 8);
 
     // Cache the results
@@ -174,7 +221,7 @@ export const getExcitingMatchesFromAPI = async (): Promise<Match[]> => {
       timestamp: Date.now()
     }));
 
-    console.log(`✅ Found ${excitingMatches.length} exciting matches from API`);
+    console.log(`✅ Found ${excitingMatches.length} exciting matches from past week`);
     return excitingMatches;
   } catch (error) {
     console.error('❌ Failed to get exciting matches from API:', error);

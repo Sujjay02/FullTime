@@ -436,44 +436,75 @@ const App: React.FC = () => {
     setSelectedEntity(entity); setView('DETAILS');
     window.scrollTo(0, 0); fetchReviews(entity.id);
 
-    // If it's a match from API-Football, fetch real or predicted lineups
-    if (entity.type === 'MATCH' && entity.id.startsWith('apif_')) {
-      const fixtureId = extractFixtureId(entity.id);
+    // If it's a match, fetch lineups (real or predicted)
+    if (entity.type === 'MATCH' && 'homeTeam' in entity && 'awayTeam' in entity) {
+      try {
+        console.log(`📋 Fetching lineups for ${entity.homeTeam} vs ${entity.awayTeam}...`);
 
-      if (fixtureId && 'homeTeam' in entity && 'awayTeam' in entity) {
-        try {
-          console.log(`📋 Fetching lineups for ${entity.homeTeam} vs ${entity.awayTeam}...`);
-          const lineupData = await getEnrichedLineups(
-            fixtureId,
-            entity.homeTeam,
-            entity.awayTeam,
-            'league' in entity ? entity.league : undefined
+        let lineupData = null;
+
+        // If it's from API-Football, try to get enriched lineups (real or predicted)
+        if (entity.id.startsWith('apif_')) {
+          const fixtureId = extractFixtureId(entity.id);
+          if (fixtureId) {
+            lineupData = await getEnrichedLineups(
+              fixtureId,
+              entity.homeTeam as string,
+              entity.awayTeam as string,
+              'league' in entity ? entity.league as string : undefined
+            );
+          }
+        }
+
+        // If no lineup data yet (non-API match or API failed), generate predicted lineups
+        if (!lineupData) {
+          console.log('⚠️ No API lineups available, generating predicted lineups...');
+          const { getPredictedLineups, calculateLineupWatchability } = await import('./services/predictedLineupsService');
+          const predicted = await getPredictedLineups(
+            entity.homeTeam as string,
+            entity.awayTeam as string,
+            ('league' in entity ? entity.league : 'League') as string
           );
 
-          if (lineupData) {
-            // Update the selected entity with lineups (real or predicted)
-            setSelectedEntity(prev => prev ? {
-              ...prev,
-              lineups: {
-                home: lineupData.home,
-                away: lineupData.away
-              },
-              bench: lineupData.bench,
-              formation: {
-                home: lineupData.homeFormation,
-                away: lineupData.awayFormation
-              },
-              isPredictedLineup: lineupData.isPredicted,
-              lineupConfidence: lineupData.confidence,
-              lineupWatchability: lineupData.lineupWatchability
-            } as Entity : null);
-
-            const type = lineupData.isPredicted ? 'Predicted' : 'Actual';
-            console.log(`✅ ${type} lineups loaded (watchability: ${lineupData.lineupWatchability?.toFixed(1)})`);
+          if (predicted) {
+            lineupData = {
+              home: predicted.home,
+              away: predicted.away,
+              bench: predicted.bench,
+              homeFormation: predicted.homeFormation,
+              awayFormation: predicted.awayFormation,
+              isPredicted: true,
+              confidence: predicted.confidence,
+              lineupWatchability: calculateLineupWatchability(predicted.home, predicted.away)
+            };
           }
-        } catch (error) {
-          console.error('❌ Failed to fetch lineups:', error);
         }
+
+        if (lineupData) {
+          // Update the selected entity with lineups (real or predicted)
+          setSelectedEntity(prev => prev ? {
+            ...prev,
+            lineups: {
+              home: lineupData.home,
+              away: lineupData.away
+            },
+            bench: lineupData.bench,
+            formation: {
+              home: lineupData.homeFormation,
+              away: lineupData.awayFormation
+            },
+            isPredictedLineup: lineupData.isPredicted,
+            lineupConfidence: lineupData.confidence,
+            lineupWatchability: lineupData.lineupWatchability
+          } as Entity : null);
+
+          const type = lineupData.isPredicted ? 'Predicted' : 'Actual';
+          console.log(`✅ ${type} lineups loaded (watchability: ${lineupData.lineupWatchability?.toFixed(1)})`);
+        } else {
+          console.warn('⚠️ Failed to generate any lineups for this match');
+        }
+      } catch (error) {
+        console.error('❌ Failed to fetch lineups:', error);
       }
     }
   }, [fetchReviews]);
