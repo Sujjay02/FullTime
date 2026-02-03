@@ -103,17 +103,18 @@ const calculateWatchability = (match: {
 
 /**
  * Get exciting matches from past week (finished matches only)
- * Sorted by watchability score based on actual results
+ * Optimized to use fewer API calls - fetches from top 3 leagues only
+ * Falls back to today's matches if API fails
  */
 export const getExcitingMatchesFromAPI = async (): Promise<Match[]> => {
-  const cacheKey = 'api_exciting_matches';
+  const cacheKey = 'api_exciting_matches_v2';
   const cached = localStorage.getItem(cacheKey);
 
   if (cached) {
     try {
       const { data, timestamp } = JSON.parse(cached);
       const age = Date.now() - timestamp;
-      if (age < 1800000) { // 30 minutes cache for historical data
+      if (age < 3600000) { // 1 hour cache for historical data
         console.log('✅ Using cached exciting matches (past week highlights)');
         return data;
       }
@@ -122,45 +123,33 @@ export const getExcitingMatchesFromAPI = async (): Promise<Match[]> => {
     }
   }
 
+  // If no API key, use today's finished matches as fallback
   if (!API_KEY) {
-    console.warn('⚠️ No API key for weekly highlights');
-    return [];
+    console.warn('⚠️ No API key for weekly highlights, using today\'s matches');
+    return getExcitingMatchesFromTodaysFixtures();
   }
 
   try {
-    // Fetch matches from the past 7 days across major leagues
-    const topLeagues = [
-      39,   // Premier League
-      140,  // La Liga
-      78,   // Bundesliga
-      135,  // Serie A
-      61,   // Ligue 1
-      2,    // Champions League
-      3     // Europa League
-    ];
-
+    // Only fetch from top 3 leagues to minimize API calls (Premier League, La Liga, Champions League)
+    const priorityLeagues = [39, 140, 2];
     const leagueNames: Record<number, string> = {
       39: 'Premier League',
       140: 'La Liga',
-      78: 'Bundesliga',
-      135: 'Serie A',
-      61: 'Ligue 1',
-      2: 'Champions League',
-      3: 'Europa League'
+      2: 'Champions League'
     };
 
     const allMatches: Match[] = [];
     const today = new Date();
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(today.getDate() - 7);
+    const threeDaysAgo = new Date(today);
+    threeDaysAgo.setDate(today.getDate() - 3); // Reduced to 3 days for fresher content
 
     const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
-    // Fetch finished matches from each league
-    for (const leagueId of topLeagues) {
+    // Fetch finished matches from priority leagues only (3 API calls instead of 7)
+    for (const leagueId of priorityLeagues) {
       try {
         const response = await fetch(
-          `${API_BASE_URL}/fixtures?league=${leagueId}&season=${today.getFullYear()}&from=${formatDate(sevenDaysAgo)}&to=${formatDate(today)}&status=FT`,
+          `${API_BASE_URL}/fixtures?league=${leagueId}&season=${today.getFullYear()}&from=${formatDate(threeDaysAgo)}&to=${formatDate(today)}&status=FT`,
           {
             headers: {
               'x-rapidapi-key': API_KEY,
@@ -210,6 +199,12 @@ export const getExcitingMatchesFromAPI = async (): Promise<Match[]> => {
       }
     }
 
+    // If no matches found, fall back to today's fixtures
+    if (allMatches.length === 0) {
+      console.log('⚠️ No weekly highlights from API, using today\'s matches');
+      return getExcitingMatchesFromTodaysFixtures();
+    }
+
     // Sort by watchability and take top 8 matches
     const excitingMatches = allMatches
       .sort((a, b) => (b.watchability || 0) - (a.watchability || 0))
@@ -225,6 +220,38 @@ export const getExcitingMatchesFromAPI = async (): Promise<Match[]> => {
     return excitingMatches;
   } catch (error) {
     console.error('❌ Failed to get exciting matches from API:', error);
+    return getExcitingMatchesFromTodaysFixtures();
+  }
+};
+
+/**
+ * Fallback: Get exciting matches from today's fixtures
+ */
+const getExcitingMatchesFromTodaysFixtures = async (): Promise<Match[]> => {
+  try {
+    const todayMatches = await fetchTodaysFixtures();
+
+    // Filter to finished matches with goals and calculate watchability
+    const excitingMatches = todayMatches
+      .filter(m => m.status === 'FT' && m.score && m.score !== 'vs')
+      .map(match => {
+        const scoreParts = (match.score || '0-0').replace(' ', '').split('-');
+        const home = parseInt(scoreParts[0]) || 0;
+        const away = parseInt(scoreParts[1]) || 0;
+        const totalGoals = home + away;
+        return {
+          ...match,
+          watchability: Math.min(5 + totalGoals * 0.7 + (Math.abs(home - away) <= 1 ? 1 : 0), 10)
+        };
+      })
+      .filter(m => (m.watchability || 0) >= 6)
+      .sort((a, b) => (b.watchability || 0) - (a.watchability || 0))
+      .slice(0, 8);
+
+    console.log(`✅ Using ${excitingMatches.length} exciting matches from today's fixtures`);
+    return excitingMatches;
+  } catch (error) {
+    console.error('❌ Fallback to today\'s fixtures also failed:', error);
     return [];
   }
 };

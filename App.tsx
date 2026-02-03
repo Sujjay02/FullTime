@@ -47,7 +47,7 @@ import {
   doc
 } from './services/firebase';
 import { User, Entity, Review, League, Match, LeagueMetric, Playlist } from './types';
-import { Loader2, Plus, RefreshCw, Filter, Flame, TrendingUp, AlertCircle, X, ListPlus, Users, Star } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, Filter, Flame, TrendingUp, AlertCircle, X, ListPlus, Users, Star, MessageSquare, Heart, Clock, BookOpen, BarChart3, Trophy } from 'lucide-react';
 import { getCachedData, setCachedData } from './services/cacheService';
 import { getUserFavorites, addFavoriteTeam, removeFavoriteTeam, UserFavorites } from './services/favoritesService';
 
@@ -130,6 +130,16 @@ const App: React.FC = () => {
   const [leagueMetrics, setLeagueMetrics] = useState<LeagueMetric[]>([]);
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [userReviews, setUserReviews] = useState<Review[]>([]);
+
+  // Letterboxd-style features
+  const [recentActivity, setRecentActivity] = useState<Review[]>([]);
+  const [popularLists, setPopularLists] = useState<Playlist[]>([]);
+  const [communityStats, setCommunityStats] = useState({
+    totalReviews: 0,
+    totalLists: 0,
+    activeUsers: 0,
+    topLeague: 'Premier League'
+  });
 
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -317,6 +327,97 @@ const App: React.FC = () => {
       } catch (err) { setReviews([]); }
   }, []);
 
+  // Fetch recent activity (community reviews) - Letterboxd style
+  const fetchRecentActivity = useCallback(async () => {
+    const cacheKey = 'recent_activity';
+    const cached = getCachedData<Review[]>(cacheKey);
+
+    if (cached) {
+      setRecentActivity(cached);
+      return;
+    }
+
+    try {
+      const q = query(
+        collection(db, 'reviews'),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      const activityData = snapshot.docs.slice(0, 10).map((doc: any) => ({
+        id: doc.id,
+        ...doc.data()
+      } as Review));
+      setRecentActivity(activityData);
+      setCachedData(cacheKey, activityData, 300); // Cache for 5 minutes
+    } catch (err) {
+      console.warn('Failed to fetch recent activity:', err);
+      setRecentActivity([]);
+    }
+  }, []);
+
+  // Fetch popular lists (community playlists) - Letterboxd style
+  const fetchPopularLists = useCallback(async () => {
+    const cacheKey = 'popular_lists';
+    const cached = getCachedData<Playlist[]>(cacheKey);
+
+    if (cached) {
+      setPopularLists(cached);
+      return;
+    }
+
+    try {
+      const q = query(
+        collection(db, 'playlists'),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      // Sort by number of matches (most popular)
+      const listsData = snapshot.docs
+        .map((doc: any) => ({ id: doc.id, ...doc.data() } as Playlist))
+        .filter(p => p.matchIds && p.matchIds.length > 0)
+        .sort((a, b) => (b.matchIds?.length || 0) - (a.matchIds?.length || 0))
+        .slice(0, 6);
+      setPopularLists(listsData);
+      setCachedData(cacheKey, listsData, 600); // Cache for 10 minutes
+    } catch (err) {
+      console.warn('Failed to fetch popular lists:', err);
+      setPopularLists([]);
+    }
+  }, []);
+
+  // Fetch community stats
+  const fetchCommunityStats = useCallback(async () => {
+    const cacheKey = 'community_stats';
+    const cached = getCachedData<typeof communityStats>(cacheKey);
+
+    if (cached) {
+      setCommunityStats(cached);
+      return;
+    }
+
+    try {
+      const [reviewsSnap, listsSnap] = await Promise.all([
+        getDocs(collection(db, 'reviews')),
+        getDocs(collection(db, 'playlists'))
+      ]);
+
+      const stats = {
+        totalReviews: reviewsSnap.size,
+        totalLists: listsSnap.size,
+        activeUsers: new Set([
+          ...reviewsSnap.docs.map(d => d.data().userId),
+          ...listsSnap.docs.map(d => d.data().userId)
+        ]).size,
+        topLeague: 'Premier League'
+      };
+
+      setCommunityStats(stats);
+      setCachedData(cacheKey, stats, 1800); // Cache for 30 minutes
+    } catch (err) {
+      console.warn('Failed to fetch community stats:', err);
+    }
+  }, []);
+
   // Progressive data loading - load in stages for faster initial render
   useEffect(() => {
     // Stage 1: Load cached live matches immediately
@@ -378,7 +479,15 @@ const App: React.FC = () => {
       }
     }, 300);
 
-    // Stage 4: Real-time live match updates (like SofaScore)
+    // Stage 4: Load Letterboxd-style community features
+    setTimeout(() => {
+      console.log('👥 Fetching community activity...');
+      fetchRecentActivity();
+      fetchPopularLists();
+      fetchCommunityStats();
+    }, 400);
+
+    // Stage 5: Real-time live match updates (like SofaScore)
     // Check for live matches every 30 seconds
     const liveInterval = setInterval(async () => {
       console.log('⚽ Checking for live match updates...');
@@ -400,7 +509,7 @@ const App: React.FC = () => {
       }
     }, 30000); // 30 seconds for live matches
 
-    // Stage 5: Full refresh every 3 minutes for non-live matches
+    // Stage 6: Full refresh every 3 minutes for non-live matches
     const fullRefreshInterval = setInterval(() => {
       console.log('🔄 Auto-refreshing all matches in background...');
       fetchLive(false); // Don't show toast for auto-refresh
@@ -851,6 +960,144 @@ const App: React.FC = () => {
                       />
                     ))}
                   </div>
+                </section>
+              )}
+
+              {/* Community Stats - Letterboxd style */}
+              <section className="bg-gradient-to-r from-dark-800 to-dark-900 border border-dark-700 rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <BarChart3 size={20} className="text-pitch-500" />
+                  <h2 className="text-lg font-bold text-white">Community Stats</h2>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <div className="text-center">
+                    <div className="text-3xl font-black text-pitch-400">{communityStats.totalReviews}</div>
+                    <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Reviews</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-black text-blue-400">{communityStats.totalLists}</div>
+                    <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Lists</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-black text-yellow-400">{communityStats.activeUsers}</div>
+                    <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Active Users</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-black text-orange-400">
+                      <Trophy size={28} className="mx-auto" />
+                    </div>
+                    <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">{communityStats.topLeague}</div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Recent Activity - Letterboxd style */}
+              {recentActivity.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-6 border-l-4 border-purple-500 pl-4">
+                    <h2 className="text-xl font-bold text-white uppercase tracking-widest">Recent Activity</h2>
+                    <MessageSquare size={18} className="text-purple-500" />
+                  </div>
+                  <div className="space-y-4">
+                    {recentActivity.slice(0, 5).map(review => (
+                      <div key={review.id} className="bg-dark-800 border border-dark-700 rounded-lg p-4 hover:border-purple-500/50 transition group">
+                        <div className="flex items-start gap-4">
+                          <img
+                            src={review.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(review.userName)}&background=random`}
+                            alt={review.userName}
+                            className="w-10 h-10 rounded-full border-2 border-dark-600"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-bold text-white">{review.userName}</span>
+                              <span className="text-gray-500 text-xs">reviewed</span>
+                              <span className="text-pitch-400 font-medium truncate">{review.entityName || 'a match'}</span>
+                            </div>
+                            <div className="flex items-center gap-1 mb-2">
+                              {[1, 2, 3, 4, 5].map(star => (
+                                <Star
+                                  key={star}
+                                  size={14}
+                                  className={star <= review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-600'}
+                                />
+                              ))}
+                            </div>
+                            <p className="text-gray-300 text-sm line-clamp-2">{review.comment}</p>
+                            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                              <span className="flex items-center gap-1">
+                                <Clock size={12} />
+                                {new Date(review.createdAt).toLocaleDateString()}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Heart size={12} />
+                                {review.likes || 0}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Popular Lists - Letterboxd style */}
+              {popularLists.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-6 border-l-4 border-blue-500 pl-4">
+                    <h2 className="text-xl font-bold text-white uppercase tracking-widest">Popular Lists</h2>
+                    <BookOpen size={18} className="text-blue-500" />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {popularLists.map(list => (
+                      <div key={list.id} className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden hover:border-blue-500/50 transition group cursor-pointer">
+                        {/* List cover - stack of match gradients */}
+                        <div className="relative h-24 overflow-hidden">
+                          <div className="absolute inset-0 flex">
+                            {list.matchIds.slice(0, 4).map((matchId, i) => (
+                              <div
+                                key={matchId}
+                                className="flex-1 opacity-80"
+                                style={{ background: getGenericImage(matchId) }}
+                              />
+                            ))}
+                          </div>
+                          <div className="absolute inset-0 bg-gradient-to-t from-dark-800 to-transparent" />
+                        </div>
+                        <div className="p-4">
+                          <h3 className="font-bold text-white mb-1 group-hover:text-blue-400 transition">{list.name}</h3>
+                          <p className="text-xs text-gray-400 line-clamp-2 mb-3">{list.description}</p>
+                          <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <ListPlus size={12} />
+                              {list.matchIds.length} matches
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock size={12} />
+                              {new Date(list.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Call to Action for non-logged in users */}
+              {!user && (
+                <section className="bg-gradient-to-br from-pitch-900/50 to-dark-900 border border-pitch-700/30 rounded-xl p-8 text-center">
+                  <h3 className="text-2xl font-bold text-white mb-3">Join the Community</h3>
+                  <p className="text-gray-400 mb-6 max-w-lg mx-auto">
+                    Create lists, rate matches, and share your football journey with fans around the world.
+                  </p>
+                  <button
+                    onClick={signInWithGoogle}
+                    className="bg-pitch-600 hover:bg-pitch-500 text-white font-bold py-3 px-8 rounded-lg transition shadow-lg shadow-pitch-900/40 flex items-center justify-center gap-2 mx-auto"
+                  >
+                    <Users size={18} />
+                    Sign Up Free
+                  </button>
                 </section>
               )}
            </div>

@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Entity, Review, Match, User, MatchEvent, LineupPlayer } from '../types';
 import StarRating from './StarRating';
-import { Trophy, TrendingUp, Users, Goal, Footprints, Shirt, Activity, Star, MapPin, Shield, Clock, CreditCard, ChevronDown, ListPlus, CheckCircle2, Info } from 'lucide-react';
+import { Trophy, TrendingUp, Users, Goal, Footprints, Shirt, Activity, Star, MapPin, Shield, Clock, CreditCard, ChevronDown, ListPlus, CheckCircle2, Info, Brain, Sparkles, Zap } from 'lucide-react';
+import { calculateMatchWatchability, calculatePlayerWatchability, calculateTeamWatchability } from '../services/mlWatchabilityService';
 
 interface EntityProfileProps {
   entity: Entity;
@@ -23,43 +24,53 @@ const getEventIcon = (type: string, detail?: string) => {
   }
 };
 
-const PlayerItem: React.FC<{ player: LineupPlayer; isHome: boolean }> = ({ player, isHome }) => (
-  <div className={`flex items-center gap-3 group cursor-pointer hover:bg-white/5 p-1.5 rounded transition ${!isHome && 'flex-row-reverse'} relative`}>
-    {/* Stats Tooltip */}
-    <div className={`absolute bottom-full mb-2 hidden group-hover:block z-50 animate-in fade-in zoom-in-95 duration-200 ${isHome ? 'left-0' : 'right-0'}`}>
-       <div className="bg-dark-700 text-white text-[10px] py-1.5 px-3 rounded border border-dark-600 shadow-2xl whitespace-nowrap flex items-center gap-3 backdrop-blur-sm">
-          <div className="flex items-center gap-1">
-            <Goal size={10} className="text-pitch-400" />
-            <span className="font-bold">{player.goals || 0}</span>
-          </div>
-          <div className="w-px h-3 bg-dark-600"></div>
-          <div className="flex items-center gap-1">
-            <Footprints size={10} className="text-blue-400" />
-            <span className="font-bold">{player.assists || 0}</span>
-          </div>
-          {player.watchability !== undefined && (
-            <>
-              <div className="w-px h-3 bg-dark-600"></div>
-              <div className="flex items-center gap-1">
-                <Star size={10} className="text-yellow-400" />
-                <span className="font-bold text-yellow-400">{player.watchability.toFixed(1)}</span>
-              </div>
-            </>
-          )}
-          <span className="text-gray-400 uppercase font-bold text-[8px] ml-1">Season</span>
-       </div>
-       <div className={`w-2 h-2 bg-dark-700 border-r border-b border-dark-600 rotate-45 absolute -bottom-1 ${isHome ? 'left-4' : 'right-4'}`}></div>
-    </div>
+const PlayerItem: React.FC<{ player: LineupPlayer; isHome: boolean }> = ({ player, isHome }) => {
+  // Calculate ML watchability for this player
+  const playerMLScore = useMemo(() => {
+    return calculatePlayerWatchability(player);
+  }, [player]);
 
-    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-mono text-[10px] font-bold border shrink-0 ${isHome ? 'bg-pitch-900 border-pitch-600 text-pitch-300' : 'bg-dark-800 border-blue-600 text-blue-300'}`}>
-      {player.number}
+  return (
+    <div className={`flex items-center gap-3 group cursor-pointer hover:bg-white/5 p-1.5 rounded transition ${!isHome && 'flex-row-reverse'} relative`}>
+      {/* Stats Tooltip with ML Score */}
+      <div className={`absolute bottom-full mb-2 hidden group-hover:block z-50 animate-in fade-in zoom-in-95 duration-200 ${isHome ? 'left-0' : 'right-0'}`}>
+         <div className="bg-dark-700 text-white text-[10px] py-1.5 px-3 rounded border border-dark-600 shadow-2xl whitespace-nowrap flex items-center gap-3 backdrop-blur-sm">
+            <div className="flex items-center gap-1">
+              <Goal size={10} className="text-pitch-400" />
+              <span className="font-bold">{player.goals || 0}</span>
+            </div>
+            <div className="w-px h-3 bg-dark-600"></div>
+            <div className="flex items-center gap-1">
+              <Footprints size={10} className="text-blue-400" />
+              <span className="font-bold">{player.assists || 0}</span>
+            </div>
+            <div className="w-px h-3 bg-dark-600"></div>
+            <div className="flex items-center gap-1">
+              <Brain size={10} className="text-purple-400" />
+              <span className={`font-bold ${playerMLScore.score >= 7 ? 'text-purple-400' : 'text-gray-400'}`}>
+                {playerMLScore.score.toFixed(1)}
+              </span>
+            </div>
+            <span className="text-gray-400 uppercase font-bold text-[8px] ml-1">ML</span>
+         </div>
+         <div className={`w-2 h-2 bg-dark-700 border-r border-b border-dark-600 rotate-45 absolute -bottom-1 ${isHome ? 'left-4' : 'right-4'}`}></div>
+      </div>
+
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-mono text-[10px] font-bold border shrink-0 ${isHome ? 'bg-pitch-900 border-pitch-600 text-pitch-300' : 'bg-dark-800 border-blue-600 text-blue-300'}`}>
+        {player.number}
+      </div>
+      <div className={`flex flex-col min-w-0 ${!isHome && 'items-end'}`}>
+        <span className="text-white font-medium text-xs group-hover:text-pitch-300 transition truncate">{player.name}</span>
+        <div className={`flex items-center gap-1 ${!isHome && 'flex-row-reverse'}`}>
+          <span className="text-[9px] text-gray-500 uppercase font-bold">{player.position}</span>
+          {playerMLScore.score >= 7 && (
+            <Sparkles size={8} className="text-purple-400" />
+          )}
+        </div>
+      </div>
     </div>
-    <div className={`flex flex-col min-w-0 ${!isHome && 'items-end'}`}>
-      <span className="text-white font-medium text-xs group-hover:text-pitch-300 transition truncate">{player.name}</span>
-      <span className="text-[9px] text-gray-500 uppercase font-bold">{player.position}</span>
-    </div>
-  </div>
-);
+  );
+};
 
 const LineupGroup = ({ title, players, isHome }: { title: string, players: LineupPlayer[], isHome: boolean }) => {
   if (players.length === 0) return null;
@@ -80,12 +91,44 @@ const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate, 
   const isUpcoming = match?.status === 'UPCOMING';
   const isLive = match?.status === 'LIVE' || match?.status === 'HT';
 
+  // ML Watchability Predictions
+  const mlPrediction = useMemo(() => {
+    if (match) {
+      return calculateMatchWatchability(
+        match.homeTeam,
+        match.awayTeam,
+        match.lineups?.home || [],
+        match.lineups?.away || [],
+        match.league
+      );
+    }
+    if (entity.type === 'PLAYER') {
+      return calculatePlayerWatchability(entity);
+    }
+    if (entity.type === 'TEAM') {
+      return calculateTeamWatchability(entity.name, entity.recentMatches, entity.league);
+    }
+    return null;
+  }, [entity, match]);
+
   const groupPlayers = (players: LineupPlayer[]) => {
     return {
-      GK: players.filter(p => p.position.includes('GK') || p.position.includes('Goalkeeper')),
-      DEF: players.filter(p => ['DEF', 'DF', 'CB', 'LB', 'RB', 'LWB', 'RWB', 'Defender'].some(pos => p.position.includes(pos)) && !p.position.includes('GK')),
-      MID: players.filter(p => ['MID', 'MF', 'CM', 'CDM', 'CAM', 'LM', 'RM', 'Midfielder'].some(pos => p.position.includes(pos))),
-      FWD: players.filter(p => ['FWD', 'FW', 'ST', 'CF', 'LW', 'RW', 'Forward', 'Striker'].some(pos => p.position.includes(pos)))
+      GK: players.filter(p => {
+        const pos = p.position?.toUpperCase() || '';
+        return pos === 'G' || pos === 'GK' || pos.includes('GOALKEEPER') || pos.includes('GOALIE');
+      }),
+      DEF: players.filter(p => {
+        const pos = p.position?.toUpperCase() || '';
+        return pos === 'D' || ['DEF', 'DF', 'CB', 'LB', 'RB', 'LWB', 'RWB', 'DEFENDER'].some(x => pos.includes(x));
+      }),
+      MID: players.filter(p => {
+        const pos = p.position?.toUpperCase() || '';
+        return pos === 'M' || ['MID', 'MF', 'CM', 'CDM', 'CAM', 'LM', 'RM', 'MIDFIELDER'].some(x => pos.includes(x));
+      }),
+      FWD: players.filter(p => {
+        const pos = p.position?.toUpperCase() || '';
+        return pos === 'F' || ['FWD', 'FW', 'ST', 'CF', 'LW', 'RW', 'FORWARD', 'STRIKER', 'ATTACKER'].some(x => pos.includes(x));
+      })
     };
   };
 
@@ -132,7 +175,7 @@ const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate, 
                 Rate / Review
               </button>
               {match && (
-                <button 
+                <button
                   onClick={() => onAddToPlaylist?.(match.id)}
                   className="bg-dark-800 hover:bg-dark-700 text-gray-200 font-bold py-2 px-6 rounded border border-dark-700 flex items-center gap-2 transition"
                 >
@@ -142,6 +185,82 @@ const EntityProfile: React.FC<EntityProfileProps> = ({ entity, reviews, onRate, 
             </div>
           </div>
         </div>
+
+        {/* ML Watchability Prediction Card */}
+        {mlPrediction && (
+          <div className="mt-8 bg-gradient-to-br from-purple-900/30 via-blue-900/20 to-dark-900 border border-purple-600/30 rounded-xl p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-purple-600/20 border border-purple-500 flex items-center justify-center">
+                  <Brain size={20} className="text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black text-purple-300 uppercase tracking-wider flex items-center gap-2">
+                    <Sparkles size={12} /> ML Watchability Score
+                  </h3>
+                  <p className="text-[10px] text-gray-500">AI-powered prediction • {Math.round(mlPrediction.confidence * 100)}% confidence</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-black text-white">
+                  {mlPrediction.score.toFixed(1)}
+                  <span className="text-sm text-gray-500">/10</span>
+                </div>
+                <div className={`text-[10px] font-bold uppercase tracking-wide mt-1 ${
+                  mlPrediction.score >= 8 ? 'text-orange-400' :
+                  mlPrediction.score >= 6 ? 'text-purple-400' :
+                  'text-gray-400'
+                }`}>
+                  {mlPrediction.score >= 9 ? '🔥 Must Watch' :
+                   mlPrediction.score >= 8 ? '⚡ Highly Recommended' :
+                   mlPrediction.score >= 6 ? '✨ Worth Watching' :
+                   '📊 Average'}
+                </div>
+              </div>
+            </div>
+
+            {/* Top Factors */}
+            {mlPrediction.topFactors.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-purple-700/30">
+                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Zap size={10} /> Key Factors
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {mlPrediction.topFactors.slice(0, 6).map((factor, idx) => (
+                    <div
+                      key={idx}
+                      className={`px-3 py-2 rounded-lg text-[10px] font-medium flex items-center justify-between ${
+                        factor.contribution > 0
+                          ? 'bg-pitch-900/40 border border-pitch-700/50 text-pitch-300'
+                          : 'bg-red-900/20 border border-red-700/30 text-red-300'
+                      }`}
+                    >
+                      <span className="truncate">{factor.factor}</span>
+                      <span className={`font-bold ml-2 ${factor.contribution > 0 ? 'text-pitch-400' : 'text-red-400'}`}>
+                        {factor.contribution > 0 ? '+' : ''}{(factor.contribution * 10).toFixed(1)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Explanation */}
+            {mlPrediction.explanation.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-purple-700/30">
+                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Analysis</div>
+                <ul className="space-y-1">
+                  {mlPrediction.explanation.map((exp, idx) => (
+                    <li key={idx} className="text-xs text-gray-400 flex items-start gap-2">
+                      <span className="text-purple-400 mt-0.5">•</span>
+                      {exp}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Player Profile Section */}
         {entity.type === 'PLAYER' && (
