@@ -41,7 +41,7 @@ export const INITIAL_LIVE_MATCHES: Match[] = [
     rating: 4.8,
     subtitle: 'Premier League • Etihad Stadium',
     status: 'LIVE',
-    watchability: 13.5,
+    watchability: 9.5,
     events: [
       { id: 'e1', type: 'GOAL', minute: "12'", player: 'Haaland', team: 'HOME' },
       { id: 'e2', type: 'GOAL', minute: "45'", player: 'Salah', team: 'AWAY' },
@@ -95,7 +95,7 @@ export const INITIAL_LIVE_MATCHES: Match[] = [
     rating: 3.9,
     subtitle: 'Serie A • San Siro',
     status: 'LIVE',
-    watchability: 4.0
+    watchability: 6.5
   }
 ];
 
@@ -113,7 +113,7 @@ export const INITIAL_EXCITING_MATCHES: Match[] = [
     rating: 4.9,
     subtitle: 'Premier League • Thriller',
     status: 'FT',
-    watchability: 14.5
+    watchability: 9.5
   },
   {
     id: 'ex2',
@@ -128,7 +128,7 @@ export const INITIAL_EXCITING_MATCHES: Match[] = [
     rating: 4.7,
     subtitle: 'DFB Pokal • Last Minute Winner',
     status: 'FT',
-    watchability: 13.8
+    watchability: 9.0
   }
 ];
 
@@ -146,7 +146,7 @@ export const INITIAL_HIGHEST_SCORING_MATCHES: Match[] = [
       rating: 4.5,
       subtitle: 'Premier League • Goal Fest',
       status: 'FT',
-      watchability: 14.0
+      watchability: 10.0
     }
 ];
 
@@ -178,7 +178,7 @@ export const INITIAL_LEAGUE_METRICS = [
       league: League.PREMIER_LEAGUE,
       subtitle: 'Premier League • Emirates Stadium',
       image: getGenericImage('tm_pl_1'),
-      watchability: 11.5
+      watchability: 9.0
     }
   },
   {
@@ -199,7 +199,7 @@ export const INITIAL_LEAGUE_METRICS = [
       league: League.LA_LIGA,
       subtitle: 'La Liga • Santiago Bernabéu',
       image: getGenericImage('tm_ll_1'),
-      watchability: 12.0
+      watchability: 9.5
     }
   },
   {
@@ -220,7 +220,7 @@ export const INITIAL_LEAGUE_METRICS = [
       league: League.BUNDESLIGA,
       subtitle: 'Bundesliga • Allianz Arena',
       image: getGenericImage('tm_bl_1'),
-      watchability: 13.0
+      watchability: 9.5
     }
   },
   {
@@ -241,7 +241,7 @@ export const INITIAL_LEAGUE_METRICS = [
       league: League.SERIE_A,
       subtitle: 'Serie A • San Siro',
       image: getGenericImage('tm_sa_1'),
-      watchability: 9.5
+      watchability: 8.0
     }
   },
   {
@@ -262,7 +262,7 @@ export const INITIAL_LEAGUE_METRICS = [
       league: League.LIGUE_1,
       subtitle: 'Ligue 1 • Parc des Princes',
       image: getGenericImage('tm_l1_1'),
-      watchability: 10.0
+      watchability: 8.5
     }
   }
 ];
