@@ -23,7 +23,7 @@ import {
   getExcitingPlayers
 } from './services/footballService';
 import { getHybridLiveMatches } from './services/hybridFootballService';
-import { fetchTodaysFixtures, fetchLiveFixtures } from './services/apiFootballService';
+import { fetchTodaysFixtures, fetchLiveFixtures, fetchUpcomingFixtures } from './services/apiFootballService';
 import { getEnrichedLineups, extractFixtureId } from './services/lineupService';
 import {
   getExcitingMatchesFromAPI,
@@ -47,7 +47,7 @@ import {
   doc
 } from './services/firebase';
 import { User, Entity, Review, League, Match, LeagueMetric, Playlist } from './types';
-import { Loader2, Plus, RefreshCw, Filter, Flame, TrendingUp, AlertCircle, X, ListPlus, Users, Star, MessageSquare, Heart, Clock, BookOpen, BarChart3, Trophy } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, Filter, Flame, TrendingUp, AlertCircle, X, ListPlus, Users, Star, MessageSquare, Heart, Clock, BookOpen, BarChart3, Trophy, Calendar } from 'lucide-react';
 import { getCachedData, setCachedData } from './services/cacheService';
 import { getUserFavorites, addFavoriteTeam, removeFavoriteTeam, UserFavorites } from './services/favoritesService';
 
@@ -121,6 +121,7 @@ const App: React.FC = () => {
   const [excitingMatches, setExcitingMatches] = useState<Match[]>(INITIAL_EXCITING_MATCHES);
   const [highestScoringMatches, setHighestScoringMatches] = useState<Match[]>(INITIAL_HIGHEST_SCORING_MATCHES);
   const [excitingPlayers, setExcitingPlayers] = useState<Entity[]>([]);
+  const [upcomingMatches, setUpcomingMatches] = useState<Match[]>([]);
 
   const [searchResults, setSearchResults] = useState<Entity[]>([]);
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
@@ -479,15 +480,26 @@ const App: React.FC = () => {
       }
     }, 300);
 
-    // Stage 4: Load Letterboxd-style community features
+    // Stage 4: Load upcoming matches
+    setTimeout(async () => {
+      try {
+        console.log('📅 Fetching upcoming matches...');
+        const upcoming = await fetchUpcomingFixtures();
+        setUpcomingMatches(upcoming);
+      } catch (err) {
+        console.error('Failed to load upcoming matches:', err);
+      }
+    }, 350);
+
+    // Stage 5: Load Letterboxd-style community features
     setTimeout(() => {
       console.log('👥 Fetching community activity...');
       fetchRecentActivity();
       fetchPopularLists();
       fetchCommunityStats();
-    }, 400);
+    }, 450);
 
-    // Stage 5: Real-time live match updates (like SofaScore)
+    // Stage 6: Real-time live match updates (like SofaScore)
     // Check for live matches every 30 seconds
     const liveInterval = setInterval(async () => {
       console.log('⚽ Checking for live match updates...');
@@ -509,7 +521,7 @@ const App: React.FC = () => {
       }
     }, 30000); // 30 seconds for live matches
 
-    // Stage 6: Full refresh every 3 minutes for non-live matches
+    // Stage 7: Full refresh every 3 minutes for non-live matches
     const fullRefreshInterval = setInterval(() => {
       console.log('🔄 Auto-refreshing all matches in background...');
       fetchLive(false); // Don't show toast for auto-refresh
@@ -789,6 +801,12 @@ const App: React.FC = () => {
       : highestScoringMatches;
   }, [highestScoringMatches, currentLeague]);
 
+  const filteredUpcomingMatches = useMemo(() => {
+    return currentLeague
+      ? upcomingMatches.filter(m => m.league === currentLeague)
+      : upcomingMatches;
+  }, [upcomingMatches, currentLeague]);
+
   // Filter matches featuring favorite teams
   const filteredFavoriteMatches = useMemo(() => {
     if (favorites.teams.length === 0) return [];
@@ -958,6 +976,53 @@ const App: React.FC = () => {
                         player={player}
                         onClick={handleEntityClick}
                       />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Upcoming Matches Section */}
+              {filteredUpcomingMatches.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-6 border-l-4 border-blue-500 pl-4">
+                    <h2 className="text-xl font-bold text-white uppercase tracking-widest">Upcoming Matches</h2>
+                    <Calendar size={18} className="text-blue-500" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {filteredUpcomingMatches.map(m => (
+                      <div
+                        key={m.id}
+                        onClick={() => handleEntityClick(m)}
+                        className="bg-gradient-to-br from-blue-900/20 to-dark-900 border border-blue-700/30 rounded-xl p-5 hover:border-blue-500 transition cursor-pointer group"
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <span className="text-[10px] text-blue-400 font-bold uppercase">{m.league}</span>
+                          {m.watchability && m.watchability >= 8 && (
+                            <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-900/40 border border-orange-600/50 rounded text-[9px] font-bold text-orange-400">
+                              <Flame size={10} />
+                              Hot
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-center mb-3">
+                          <div className="text-sm font-bold text-gray-200 mb-1 group-hover:text-white transition">{m.homeTeam}</div>
+                          <div className="text-xs text-gray-500 font-bold my-2">VS</div>
+                          <div className="text-sm font-bold text-gray-200 group-hover:text-white transition">{m.awayTeam}</div>
+                        </div>
+                        <div className="flex items-center justify-center gap-2 text-[10px] text-blue-400 border-t border-blue-900/30 pt-3 mt-3">
+                          <Clock size={12} />
+                          <span className="font-medium">{m.minute}</span>
+                        </div>
+                        {m.watchability && (
+                          <div className="mt-2 text-center">
+                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+                              m.watchability >= 8 ? 'bg-pitch-900/40 text-pitch-400' : 'bg-dark-800 text-gray-500'
+                            }`}>
+                              Watchability: {m.watchability.toFixed(1)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </section>

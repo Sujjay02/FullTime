@@ -353,6 +353,141 @@ export const fetchLiveFixtures = async (): Promise<Match[]> => {
 };
 
 /**
+ * Fetch upcoming fixtures (next 3 days)
+ */
+export const fetchUpcomingFixtures = async (): Promise<Match[]> => {
+  if (!API_KEY) {
+    console.warn('⚠️ No API-Football key found');
+    return [];
+  }
+
+  // Check cache first (cache for 10 minutes for upcoming matches)
+  const cacheKey = 'apif_upcoming';
+  const cached = localStorage.getItem(cacheKey);
+
+  if (cached) {
+    try {
+      const { data, timestamp } = JSON.parse(cached);
+      const age = Date.now() - timestamp;
+
+      // Cache valid for 10 minutes (600000ms)
+      if (age < 600000) {
+        console.log('✅ Using cached upcoming fixtures');
+        return data;
+      }
+    } catch (e) {
+      localStorage.removeItem(cacheKey);
+    }
+  }
+
+  try {
+    // Get fixtures for next 3 days
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const dayAfter = new Date(today);
+    dayAfter.setDate(today.getDate() + 2);
+    const threeDaysLater = new Date(today);
+    threeDaysLater.setDate(today.getDate() + 3);
+
+    const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+    // Fetch fixtures for next 3 days
+    const dates = [formatDate(tomorrow), formatDate(dayAfter), formatDate(threeDaysLater)];
+    const allMatches: Match[] = [];
+
+    // Major leagues and cups
+    const includedLeagueIds = [
+      39, 140, 78, 135, 61, 253,  // Leagues
+      2, 3, 848,                   // European
+      48, 45, 46, 143, 556, 81, 137, 547, 66, 65  // Cups
+    ];
+
+    for (const date of dates) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/fixtures?date=${date}`, {
+          headers: {
+            'x-rapidapi-key': API_KEY,
+            'x-rapidapi-host': 'v3.football.api-sports.io'
+          }
+        });
+
+        if (!response.ok) continue;
+
+        const data = await response.json();
+        const fixtures: ApiFixture[] = data.response || [];
+
+        const matches: Match[] = fixtures
+          .filter(f => includedLeagueIds.includes(f.league.id))
+          .filter(f => f.fixture.status.short === 'NS' || f.fixture.status.short === 'TBD')
+          .map((fixture) => {
+            const matchTime = new Date(fixture.fixture.date);
+            const timeStr = matchTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const dateStr = matchTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+            const matchId = `apif_${fixture.fixture.id}`;
+
+            // Calculate upcoming match watchability based on teams
+            let watchability = 6.0;
+            const bigTeams = [
+              'Manchester United', 'Manchester City', 'Liverpool', 'Arsenal', 'Chelsea', 'Tottenham',
+              'Real Madrid', 'Barcelona', 'Atletico Madrid',
+              'Bayern Munich', 'Borussia Dortmund',
+              'Juventus', 'Inter', 'AC Milan', 'Napoli',
+              'PSG', 'Marseille'
+            ];
+            const homeIsBig = bigTeams.some(t => fixture.teams.home.name.includes(t));
+            const awayIsBig = bigTeams.some(t => fixture.teams.away.name.includes(t));
+            if (homeIsBig && awayIsBig) watchability = 9.0;
+            else if (homeIsBig || awayIsBig) watchability = 7.5;
+
+            return {
+              id: matchId,
+              name: `${fixture.teams.home.name} vs ${fixture.teams.away.name}`,
+              type: 'MATCH' as const,
+              homeTeam: fixture.teams.home.name,
+              awayTeam: fixture.teams.away.name,
+              score: 'vs',
+              minute: `${dateStr} • ${timeStr}`,
+              league: mapLeagueIdToLeague(fixture.league.id, fixture.league.name),
+              status: 'UPCOMING' as MatchStatus,
+              subtitle: `${mapLeagueIdToLeague(fixture.league.id, fixture.league.name)} • ${dateStr}`,
+              image: getGenericImage(matchId),
+              watchability,
+              rating: 0,
+              events: [],
+              lineups: { home: [], away: [] },
+              bench: { home: [], away: [] },
+              formation: { home: '4-3-3', away: '4-3-3' }
+            };
+          });
+
+        allMatches.push(...matches);
+      } catch (err) {
+        console.error(`Failed to fetch fixtures for ${date}:`, err);
+      }
+    }
+
+    // Sort by watchability and take top 12
+    const sortedMatches = allMatches
+      .sort((a, b) => (b.watchability || 0) - (a.watchability || 0))
+      .slice(0, 12);
+
+    // Cache the results
+    localStorage.setItem(cacheKey, JSON.stringify({
+      data: sortedMatches,
+      timestamp: Date.now()
+    }));
+
+    console.log(`✅ API-Football: Fetched ${sortedMatches.length} upcoming fixtures`);
+    return sortedMatches;
+  } catch (error) {
+    console.error('❌ API-Football upcoming error:', error);
+    return [];
+  }
+};
+
+/**
  * Fetch detailed lineup for a specific match
  */
 export const fetchMatchLineups = async (fixtureId: number): Promise<{
