@@ -1,8 +1,3 @@
-/**
- * Team Profile Component
- * Displays team information, recent matches, squad, and manager
- */
-
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Users, Trophy, TrendingUp, Flame } from 'lucide-react';
 import { getTeamData } from '../services/teamService';
@@ -22,15 +17,7 @@ interface TeamProfileProps {
   isFavorited?: boolean;
 }
 
-const TeamProfile: React.FC<TeamProfileProps> = ({
-  teamName,
-  league,
-  onBack,
-  onMatchClick,
-  onPlayerClick,
-  onToggleFavorite,
-  isFavorited = false
-}) => {
+const TeamProfile: React.FC<TeamProfileProps> = ({ teamName, league, onBack, onMatchClick, onPlayerClick, onToggleFavorite, isFavorited = false }) => {
   const [teamData, setTeamData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'squad' | 'matches'>('squad');
@@ -47,16 +34,15 @@ const TeamProfile: React.FC<TeamProfileProps> = ({
         setIsLoading(false);
       }
     };
-
     fetchTeamData();
   }, [teamName, league]);
 
   if (isLoading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6">
         <div className="animate-pulse">
-          <div className="h-64 bg-dark-800 rounded-xl mb-6"></div>
-          <div className="h-12 bg-dark-800 rounded-lg w-1/3 mb-4"></div>
+          <div className="h-52 bg-dark-800 rounded-xl mb-5" />
+          <div className="h-10 bg-dark-800 rounded-lg w-1/3 mb-4" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <LoadingSkeleton type="match" count={4} />
           </div>
@@ -68,128 +54,71 @@ const TeamProfile: React.FC<TeamProfileProps> = ({
   if (!teamData) {
     return (
       <div className="text-center py-20">
-        <p className="text-gray-400">Failed to load team data</p>
-        <button
-          onClick={onBack}
-          className="mt-4 px-6 py-2 bg-pitch-600 hover:bg-pitch-500 rounded-lg transition"
-        >
-          Go Back
-        </button>
+        <p className="text-zinc-500">Failed to load team data</p>
+        <button onClick={onBack} className="mt-4 px-5 py-2 bg-pitch-600 hover:bg-pitch-500 rounded-lg transition text-white text-sm font-semibold">Go Back</button>
       </div>
     );
   }
 
-  const getWatchabilityColor = (score: number) => {
-    if (score >= 8.5) return 'text-orange-400';
-    if (score >= 7) return 'text-yellow-400';
-    return 'text-gray-400';
-  };
-
-  const getWatchabilityBg = (score: number) => {
-    if (score >= 8.5) return 'from-orange-600 to-orange-800';
-    if (score >= 7) return 'from-yellow-600 to-yellow-800';
-    return 'from-gray-600 to-gray-800';
-  };
+  const getAccentColor = (score: number) => score >= 8.5 ? 'text-orange-400' : score >= 7 ? 'text-amber-400' : 'text-zinc-400';
+  const getAccentGrad = (score: number) => score >= 8.5 ? 'from-orange-600 to-orange-800' : score >= 7 ? 'from-amber-600 to-amber-800' : 'from-zinc-600 to-zinc-800';
 
   return (
-    <div className="space-y-8">
-      {/* Back Button */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-gray-400 hover:text-white transition group"
-      >
-        <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-        <span>Back</span>
+    <div className="space-y-6 animate-fade-in">
+      <button onClick={onBack} className="flex items-center gap-2 text-zinc-500 hover:text-white transition group">
+        <ArrowLeft size={18} className="group-hover:-translate-x-0.5 transition-transform" />
+        <span className="text-sm">Back</span>
       </button>
 
-      {/* Team Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-dark-800 via-dark-900 to-dark-900 border border-dark-700 p-8 shadow-2xl">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/60-lines.png')] opacity-5"></div>
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-xl bg-dark-800 border border-white/[0.06] p-6 md:p-8">
+        <div className={`absolute top-0 right-0 w-80 h-80 bg-gradient-to-br ${getAccentGrad(teamData.avgWatchability)} rounded-full blur-3xl opacity-10`} />
 
-        {/* Glow Effect */}
-        <div className={`absolute top-0 right-0 w-96 h-96 bg-gradient-to-br ${getWatchabilityBg(teamData.avgWatchability)} rounded-full blur-3xl opacity-20`}></div>
-
-        <div className="relative z-10 flex items-start gap-6">
-          {/* Team Logo */}
-          <div className={`w-32 h-32 rounded-full bg-gradient-to-br ${getWatchabilityBg(teamData.avgWatchability)} flex items-center justify-center text-white font-black text-4xl shadow-2xl`}>
+        <div className="relative z-10 flex flex-col md:flex-row items-start gap-5">
+          <div className={`w-24 h-24 md:w-28 md:h-28 rounded-full bg-gradient-to-br ${getAccentGrad(teamData.avgWatchability)} flex items-center justify-center text-white font-black text-3xl shadow-xl shrink-0`}>
             {teamName.substring(0, 2).toUpperCase()}
           </div>
 
-          {/* Team Info */}
           <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-4xl font-black text-white">{teamData.name}</h1>
-              {teamData.avgWatchability >= 8 && (
-                <Flame className="text-orange-500 fill-orange-500 animate-pulse" size={28} />
-              )}
-              {onToggleFavorite && (
-                <FavoriteButton
-                  isFavorited={isFavorited}
-                  onToggle={() => onToggleFavorite(teamData.name)}
-                  size={24}
-                />
-              )}
+            <div className="flex items-center gap-3 mb-1.5 flex-wrap">
+              <h1 className="text-3xl font-bold text-white">{teamData.name}</h1>
+              {teamData.avgWatchability >= 8 && <Flame className="text-orange-500 fill-orange-500" size={22} />}
+              {onToggleFavorite && <FavoriteButton isFavorited={isFavorited} onToggle={() => onToggleFavorite(teamData.name)} size={20} />}
             </div>
-            <p className="text-lg text-gray-400 mb-4">{teamData.league}</p>
+            <p className="text-zinc-500 mb-4">{teamData.league}</p>
 
-            {/* Team Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-black/30 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-                <div className="text-sm text-gray-400 mb-1">Formation</div>
-                <div className="text-2xl font-bold text-white">{teamData.formation}</div>
-              </div>
-
-              <div className="bg-black/30 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-                <div className="text-sm text-gray-400 mb-1">Team Quality</div>
-                <div className={`text-2xl font-bold ${getWatchabilityColor(teamData.avgWatchability)}`}>
-                  {teamData.avgWatchability.toFixed(1)}/10
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: 'Formation', value: teamData.formation },
+                { label: 'Team Quality', value: `${teamData.avgWatchability.toFixed(1)}/10`, color: getAccentColor(teamData.avgWatchability) },
+                { label: 'Manager', value: teamData.manager.name },
+                { label: 'Tactical Rating', value: `${teamData.manager.watchability.toFixed(1)}/10`, color: getAccentColor(teamData.manager.watchability) },
+              ].map((s) => (
+                <div key={s.label} className="bg-black/20 backdrop-blur-sm rounded-lg p-3 border border-white/[0.04]">
+                  <div className="text-xs text-zinc-500 mb-0.5">{s.label}</div>
+                  <div className={`text-lg font-bold truncate ${s.color || 'text-white'}`}>{s.value}</div>
                 </div>
-              </div>
-
-              <div className="bg-black/30 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-                <div className="text-sm text-gray-400 mb-1">Manager</div>
-                <div className="text-lg font-bold text-white truncate">{teamData.manager.name}</div>
-              </div>
-
-              <div className="bg-black/30 backdrop-blur-sm rounded-lg p-4 border border-white/10">
-                <div className="text-sm text-gray-400 mb-1">Manager Rating</div>
-                <div className={`text-2xl font-bold ${getWatchabilityColor(teamData.manager.watchability)}`}>
-                  {teamData.manager.watchability.toFixed(1)}/10
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Manager Card */}
+      {/* Manager */}
       <section>
-        <div className="flex items-center gap-2 mb-6 border-l-4 border-purple-500 pl-4">
-          <h2 className="text-xl font-bold text-white uppercase tracking-widest">Manager</h2>
-          <Trophy size={18} className="text-purple-500" />
-        </div>
-
-        <div className="bg-dark-800 rounded-xl p-6 border border-dark-700 hover:border-purple-500 transition-all duration-300 max-w-md">
-          <div className="flex items-start gap-4">
-            {/* Manager Avatar */}
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center text-white font-black text-2xl shadow-lg">
+        <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Trophy size={14} className="text-violet-400" /> Manager
+        </h2>
+        <div className="bg-dark-800 rounded-xl p-5 border border-white/[0.06] max-w-md">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-violet-600 to-violet-800 flex items-center justify-center text-white font-bold text-lg shadow-lg shrink-0">
               {teamData.manager.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
             </div>
-
-            {/* Manager Info */}
-            <div className="flex-1">
-              <h3 className="text-xl font-bold text-white mb-1">{teamData.manager.name}</h3>
-              <p className="text-sm text-gray-400 mb-3">
-                {teamData.manager.nationality} • {teamData.manager.age} years old
-              </p>
-
-              {/* Manager Watchability */}
-              <div className="flex items-center gap-2">
-                <div className="px-3 py-1 bg-purple-500/20 border border-purple-500/50 rounded-full text-xs font-bold text-purple-300 flex items-center gap-1">
-                  <TrendingUp size={12} />
-                  <span>Tactical Rating: {teamData.manager.watchability.toFixed(1)}/10</span>
-                </div>
+            <div>
+              <h3 className="text-base font-semibold text-white">{teamData.manager.name}</h3>
+              <p className="text-sm text-zinc-500">{teamData.manager.nationality} · {teamData.manager.age} years old</p>
+              <div className="mt-1.5 px-2 py-0.5 bg-violet-500/15 border border-violet-500/30 rounded text-xs font-semibold text-violet-300 inline-flex items-center gap-1">
+                <TrendingUp size={10} /> Tactical: {teamData.manager.watchability.toFixed(1)}/10
               </div>
             </div>
           </div>
@@ -197,82 +126,46 @@ const TeamProfile: React.FC<TeamProfileProps> = ({
       </section>
 
       {/* Tabs */}
-      <div className="flex gap-4 border-b border-dark-700">
-        <button
-          onClick={() => setActiveTab('squad')}
-          className={`pb-3 px-4 font-bold transition-all ${
-            activeTab === 'squad'
-              ? 'text-pitch-400 border-b-2 border-pitch-400'
-              : 'text-gray-500 hover:text-gray-300'
-          }`}
-        >
-          Squad ({teamData.squad.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('matches')}
-          className={`pb-3 px-4 font-bold transition-all ${
-            activeTab === 'matches'
-              ? 'text-pitch-400 border-b-2 border-pitch-400'
-              : 'text-gray-500 hover:text-gray-300'
-          }`}
-        >
-          Recent Matches
-        </button>
+      <div className="flex gap-4 border-b border-white/[0.06]">
+        {[
+          { id: 'squad' as const, label: `Squad (${teamData.squad.length})` },
+          { id: 'matches' as const, label: 'Recent Matches' },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`pb-2.5 px-3 text-sm font-semibold transition-all border-b-2 ${
+              activeTab === tab.id ? 'text-pitch-400 border-pitch-400' : 'text-zinc-500 border-transparent hover:text-zinc-300'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Squad Tab */}
       {activeTab === 'squad' && (
-        <section>
-          <div className="flex items-center gap-2 mb-6 border-l-4 border-yellow-500 pl-4">
-            <h2 className="text-xl font-bold text-white uppercase tracking-widest">Current Squad</h2>
-            <Users size={18} className="text-yellow-500" />
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            {teamData.squad.map((player: LineupPlayer, idx: number) => {
-              const playerEntity: Entity = {
-                id: `${teamData.id}_player_${idx}`,
-                name: player.name,
-                type: 'PLAYER',
-                subtitle: `${player.position} • #${player.number}`,
-                watchability: player.watchability,
-                image: '',
-                stats: {
-                  goals: player.goals || 0,
-                  assists: player.assists || 0
-                }
-              };
-
-              return (
-                <EnhancedPlayerCard
-                  key={idx}
-                  player={playerEntity}
-                  onClick={onPlayerClick}
-                />
-              );
-            })}
-          </div>
-        </section>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {teamData.squad.map((player: LineupPlayer, idx: number) => {
+            const playerEntity: Entity = {
+              id: `${teamData.id}_player_${idx}`,
+              name: player.name,
+              type: 'PLAYER',
+              subtitle: `${player.position} · #${player.number}`,
+              watchability: player.watchability,
+              image: '',
+              stats: { goals: player.goals || 0, assists: player.assists || 0 }
+            };
+            return <EnhancedPlayerCard key={idx} player={playerEntity} onClick={onPlayerClick} />;
+          })}
+        </div>
       )}
 
-      {/* Recent Matches Tab */}
       {activeTab === 'matches' && (
-        <section>
-          <div className="flex items-center gap-2 mb-6 border-l-4 border-orange-500 pl-4">
-            <h2 className="text-xl font-bold text-white uppercase tracking-widest">Recent Matches</h2>
-            <Trophy size={18} className="text-orange-500" />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {teamData.recentMatches.map((match: Match) => (
-              <EnhancedMatchCard
-                key={match.id}
-                match={match}
-                onClick={() => onMatchClick(match)}
-              />
-            ))}
-          </div>
-        </section>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {teamData.recentMatches.map((match: Match) => (
+            <EnhancedMatchCard key={match.id} match={match} onClick={() => onMatchClick(match)} />
+          ))}
+        </div>
       )}
     </div>
   );

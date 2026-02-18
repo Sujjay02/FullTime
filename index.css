@@ -1,12 +1,11 @@
 @import "tailwindcss";
 
-/* Custom theme configuration */
 @theme {
-  --font-family-sans: 'Inter', sans-serif;
+  --font-family-sans: 'Inter', system-ui, -apple-system, sans-serif;
 
-  /* Pitch green colors */
   --color-pitch-50: #ecfdf5;
   --color-pitch-100: #d1fae5;
+  --color-pitch-200: #a7f3d0;
   --color-pitch-300: #6ee7b7;
   --color-pitch-400: #34d399;
   --color-pitch-500: #10b981;
@@ -15,41 +14,43 @@
   --color-pitch-800: #065f46;
   --color-pitch-900: #064e3b;
 
-  /* Dark theme colors */
-  --color-dark-900: #121212;
-  --color-dark-800: #1e1e1e;
-  --color-dark-700: #2d2d2d;
-  --color-dark-600: #404040;
+  --color-dark-950: #0a0a0b;
+  --color-dark-900: #111113;
+  --color-dark-800: #1a1a1f;
+  --color-dark-700: #252530;
+  --color-dark-600: #35354a;
 
-  /* Custom animations */
   --animate-shimmer: shimmer 2s infinite linear;
+  --animate-fade-in: fade-in 0.3s ease-out;
+  --animate-slide-up: slide-up 0.4s ease-out;
 
   @keyframes shimmer {
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
   }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 }
 
-/* Base styles */
+html { scroll-behavior: smooth; }
+
 body {
-  background-color: #121212;
-  color: #e5e5e5;
+  background-color: #0a0a0b;
+  color: #e4e4e7;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar for webkit browsers */
-::-webkit-scrollbar {
-  width: 8px;
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #252530; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #35354a; }
 
-::-webkit-scrollbar-track {
-  background: #1e1e1e;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #404040;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #505050;
-}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

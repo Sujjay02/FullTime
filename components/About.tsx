@@ -1,330 +1,157 @@
-
 import React from 'react';
 import { TrendingUp, Zap, Target, Brain, Sparkles, BarChart3, Trophy, Clock, Star, Users, Search, Shield } from 'lucide-react';
 
 const About: React.FC = () => {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Hero Section */}
-      <div className="text-center mb-16">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pitch-600/20 to-orange-600/20 border border-pitch-500/50 rounded-full text-sm font-bold text-pitch-300 uppercase tracking-wider mb-6">
-          <Sparkles size={16} className="text-orange-400" />
-          About FullTime
-          <span className="px-2 py-0.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-full text-[10px]">Beta</span>
+    <div className="max-w-4xl mx-auto px-4 py-10 pb-20 animate-fade-in">
+      {/* Hero */}
+      <div className="text-center mb-14">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-pitch-600/10 border border-pitch-500/30 rounded-full text-sm font-semibold text-pitch-300 uppercase tracking-wider mb-5">
+          <Sparkles size={14} className="text-orange-400" /> About FullTime
         </div>
-        <h1 className="text-4xl md:text-5xl font-black text-white mb-4">
-          Never Miss a <span className="bg-gradient-to-r from-pitch-400 to-orange-400 bg-clip-text text-transparent">Legendary</span> Match
+        <h1 className="text-3xl md:text-5xl font-bold text-white mb-4">
+          Never Miss a <span className="text-pitch-400">Legendary</span> Match
         </h1>
-        <p className="text-xl text-gray-300 leading-relaxed max-w-2xl mx-auto">
-          AI-powered football match discovery that helps you find the most entertaining games worth watching, explore teams, and follow your favorites.
+        <p className="text-lg text-zinc-400 leading-relaxed max-w-2xl mx-auto">
+          AI-powered football match discovery that helps you find the most entertaining games, explore teams, and follow your favorites.
         </p>
       </div>
 
-      {/* Key Features Section */}
-      <div className="mb-12">
-        <h2 className="text-3xl font-black text-white mb-8 text-center">
-          Powerful Features
-        </h2>
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-gradient-to-br from-pitch-900/40 to-dark-800 border border-pitch-700/50 rounded-xl p-6 hover:border-pitch-500/50 transition-all duration-300">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-3 bg-pitch-600/20 rounded-lg">
-                <Star className="text-yellow-400" size={24} />
-              </div>
-              <h3 className="text-xl font-black text-white">Favorite Teams</h3>
-            </div>
-            <p className="text-gray-300 text-sm leading-relaxed">
-              Save your favorite teams and get a personalized feed of matches featuring them. Never miss when your teams are playing.
-            </p>
-          </div>
-
-          <div className="bg-gradient-to-br from-blue-900/40 to-dark-800 border border-blue-700/50 rounded-xl p-6 hover:border-blue-500/50 transition-all duration-300">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-3 bg-blue-600/20 rounded-lg">
-                <Users className="text-blue-400" size={24} />
-              </div>
-              <h3 className="text-xl font-black text-white">Team Profiles</h3>
-            </div>
-            <p className="text-gray-300 text-sm leading-relaxed">
-              Explore comprehensive team pages with current squad, recent matches, manager info, formations, and team quality ratings.
-            </p>
-          </div>
-
-          <div className="bg-gradient-to-br from-purple-900/40 to-dark-800 border border-purple-700/50 rounded-xl p-6 hover:border-purple-500/50 transition-all duration-300">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-3 bg-purple-600/20 rounded-lg">
-                <Shield className="text-purple-400" size={24} />
-              </div>
-              <h3 className="text-xl font-black text-white">AI Predicted Lineups</h3>
-            </div>
-            <p className="text-gray-300 text-sm leading-relaxed">
-              Get AI-generated predicted starting XIs when official lineups aren't available yet, with confidence ratings and watchability scores.
-            </p>
-          </div>
-
-          <div className="bg-gradient-to-br from-orange-900/40 to-dark-800 border border-orange-700/50 rounded-xl p-6 hover:border-orange-500/50 transition-all duration-300">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-3 bg-orange-600/20 rounded-lg">
-                <Search className="text-orange-400" size={24} />
-              </div>
-              <h3 className="text-xl font-black text-white">Smart Discovery</h3>
-            </div>
-            <p className="text-gray-300 text-sm leading-relaxed">
-              Find matches by league, team, or player. AI-powered search understands context and delivers the most relevant results.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Watchability Score Section */}
-      <div className="bg-dark-800 border border-dark-700 rounded-xl p-8 mb-12">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-3 bg-pitch-600/20 rounded-lg">
-            <Sparkles className="text-pitch-400" size={28} />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black text-white">Watchability Score</h2>
-            <p className="text-gray-400 text-sm">How we calculate it</p>
-          </div>
-        </div>
-
-        <p className="text-gray-300 mb-6 leading-relaxed">
-          Our watchability score (0-100) uses advanced AI analysis to evaluate how entertaining a match will be.
-          Here's what goes into the calculation:
-        </p>
-
+      {/* Features */}
+      <div className="mb-10">
+        <h2 className="text-2xl font-bold text-white mb-6 text-center">Key Features</h2>
         <div className="grid md:grid-cols-2 gap-4">
-          <div className="bg-dark-900/50 border border-dark-700 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <Zap className="text-orange-400 mt-1" size={20} />
-              <div>
-                <h3 className="font-bold text-white mb-1">Match Intensity</h3>
-                <p className="text-sm text-gray-400">
-                  Goals scored, shots on target, possession battles, and attacking play frequency
-                </p>
+          {[
+            { icon: <Star className="text-amber-400" size={22} />, title: 'Favorite Teams', desc: 'Save your favorite teams and get a personalized feed of matches featuring them.', color: 'from-amber-900/20 to-dark-800 border-amber-700/30' },
+            { icon: <Users className="text-blue-400" size={22} />, title: 'Team Profiles', desc: 'Comprehensive team pages with squad, recent matches, manager info, and quality ratings.', color: 'from-blue-900/20 to-dark-800 border-blue-700/30' },
+            { icon: <Shield className="text-violet-400" size={22} />, title: 'AI Predicted Lineups', desc: 'AI-generated predicted starting XIs with confidence ratings and watchability scores.', color: 'from-violet-900/20 to-dark-800 border-violet-700/30' },
+            { icon: <Search className="text-orange-400" size={22} />, title: 'Smart Discovery', desc: 'AI-powered search that understands context and delivers relevant results.', color: 'from-orange-900/20 to-dark-800 border-orange-700/30' },
+          ].map(f => (
+            <div key={f.title} className={`bg-gradient-to-br ${f.color} border rounded-xl p-5 hover:border-opacity-60 transition`}>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-white/[0.05] rounded-lg">{f.icon}</div>
+                <h3 className="text-lg font-bold text-white">{f.title}</h3>
               </div>
+              <p className="text-zinc-400 text-sm leading-relaxed">{f.desc}</p>
             </div>
-          </div>
+          ))}
+        </div>
+      </div>
 
-          <div className="bg-dark-900/50 border border-dark-700 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <TrendingUp className="text-blue-400 mt-1" size={20} />
-              <div>
-                <h3 className="font-bold text-white mb-1">Drama Factor</h3>
-                <p className="text-sm text-gray-400">
-                  Comebacks, late goals, close scorelines, and momentum swings
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-dark-900/50 border border-dark-700 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <Trophy className="text-yellow-400 mt-1" size={20} />
-              <div>
-                <h3 className="font-bold text-white mb-1">Team Quality</h3>
-                <p className="text-sm text-gray-400">
-                  League standings, recent form, head-to-head history, and rivalry intensity
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-dark-900/50 border border-dark-700 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <Target className="text-green-400 mt-1" size={20} />
-              <div>
-                <h3 className="font-bold text-white mb-1">Match Stakes</h3>
-                <p className="text-sm text-gray-400">
-                  Title races, relegation battles, derby matches, and knockout stages
-                </p>
-              </div>
-            </div>
+      {/* Watchability */}
+      <div className="bg-dark-800 border border-white/[0.06] rounded-xl p-6 mb-10">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="p-2 bg-pitch-600/15 rounded-lg"><Sparkles className="text-pitch-400" size={22} /></div>
+          <div>
+            <h2 className="text-xl font-bold text-white">Watchability Score</h2>
+            <p className="text-zinc-500 text-sm">How we calculate it</p>
           </div>
         </div>
-
-        <div className="mt-6 p-4 bg-pitch-900/20 border border-pitch-700/50 rounded-lg">
-          <div className="flex items-start gap-3">
-            <Brain className="text-pitch-400 mt-1" size={20} />
-            <div>
-              <h3 className="font-bold text-white mb-2">AI-Powered Analysis</h3>
-              <p className="text-sm text-gray-300 leading-relaxed">
-                Our system uses Google's Gemini AI to analyze thousands of data points including
-                real-time match events, historical statistics, player performance, tactical setups,
-                and crowd engagement to predict match entertainment value.
-              </p>
+        <p className="text-zinc-400 mb-5 leading-relaxed text-sm">
+          Our watchability score uses AI analysis to evaluate how entertaining a match will be, considering multiple factors:
+        </p>
+        <div className="grid md:grid-cols-2 gap-3">
+          {[
+            { icon: <Zap className="text-orange-400" size={18} />, title: 'Match Intensity', desc: 'Goals, shots, possession battles, attacking frequency' },
+            { icon: <TrendingUp className="text-blue-400" size={18} />, title: 'Drama Factor', desc: 'Comebacks, late goals, close scorelines, momentum swings' },
+            { icon: <Trophy className="text-amber-400" size={18} />, title: 'Team Quality', desc: 'League standings, form, head-to-head, rivalry intensity' },
+            { icon: <Target className="text-emerald-400" size={18} />, title: 'Match Stakes', desc: 'Title races, relegation, derbies, knockout stages' },
+          ].map(f => (
+            <div key={f.title} className="bg-dark-900/50 border border-white/[0.04] rounded-lg p-3.5 flex items-start gap-3">
+              <div className="mt-0.5 shrink-0">{f.icon}</div>
+              <div>
+                <h3 className="font-semibold text-white text-sm mb-0.5">{f.title}</h3>
+                <p className="text-xs text-zinc-500">{f.desc}</p>
+              </div>
             </div>
+          ))}
+        </div>
+        <div className="mt-4 p-3.5 bg-pitch-900/15 border border-pitch-700/30 rounded-lg flex items-start gap-3">
+          <Brain className="text-pitch-400 mt-0.5 shrink-0" size={18} />
+          <div>
+            <h3 className="font-semibold text-white text-sm mb-1">AI-Powered</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Using Gemini AI to analyze real-time match events, historical stats, player performance, and tactical setups.
+            </p>
           </div>
         </div>
       </div>
 
       {/* Score Ranges */}
-      <div className="bg-dark-800 border border-dark-700 rounded-xl p-8 mb-12">
-        <h2 className="text-2xl font-black text-white mb-6 flex items-center gap-2">
-          <BarChart3 className="text-pitch-400" size={24} />
-          Score Ranges
+      <div className="bg-dark-800 border border-white/[0.06] rounded-xl p-6 mb-10">
+        <h2 className="text-xl font-bold text-white mb-5 flex items-center gap-2">
+          <BarChart3 className="text-pitch-400" size={20} /> Score Ranges
         </h2>
-
         <div className="space-y-3">
-          <div className="flex items-center gap-4">
-            <div className="w-16 text-center">
-              <div className="text-2xl font-black text-orange-400">90+</div>
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="px-2 py-0.5 bg-orange-500/20 border border-orange-500/50 rounded text-xs font-bold text-orange-300 uppercase">
-                  Must Watch
-                </span>
-                <span className="text-sm font-bold text-white">Legendary</span>
+          {[
+            { range: '9+', label: 'Must Watch', color: 'text-orange-400', badge: 'bg-orange-500/15 border-orange-500/30 text-orange-300' },
+            { range: '7-9', label: 'Highly Rated', color: 'text-pitch-400', badge: 'bg-pitch-500/15 border-pitch-500/30 text-pitch-300' },
+            { range: '5-7', label: 'Good', color: 'text-blue-400', badge: '' },
+            { range: '<5', label: 'Average', color: 'text-zinc-500', badge: '' },
+          ].map((s, i) => (
+            <React.Fragment key={s.range}>
+              {i > 0 && <div className="h-px bg-white/[0.04]" />}
+              <div className="flex items-center gap-4">
+                <div className="w-12 text-center">
+                  <div className={`text-xl font-bold ${s.color}`}>{s.range}</div>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    {s.badge && <span className={`px-2 py-0.5 ${s.badge} border rounded text-xs font-semibold uppercase`}>{s.label}</span>}
+                    <span className="text-sm font-semibold text-white">{s.label}</span>
+                  </div>
+                </div>
               </div>
-              <p className="text-sm text-gray-400">
-                Absolute classics - thrillers, comebacks, historic moments, or high-stakes drama
-              </p>
-            </div>
-          </div>
-
-          <div className="h-px bg-dark-700"></div>
-
-          <div className="flex items-center gap-4">
-            <div className="w-16 text-center">
-              <div className="text-2xl font-black text-pitch-400">75-89</div>
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="px-2 py-0.5 bg-pitch-500/20 border border-pitch-500/50 rounded text-xs font-bold text-pitch-300 uppercase">
-                  Highly Rated
-                </span>
-                <span className="text-sm font-bold text-white">Excellent</span>
-              </div>
-              <p className="text-sm text-gray-400">
-                High-quality matches with great attacking play, multiple goals, and entertaining action
-              </p>
-            </div>
-          </div>
-
-          <div className="h-px bg-dark-700"></div>
-
-          <div className="flex items-center gap-4">
-            <div className="w-16 text-center">
-              <div className="text-2xl font-black text-blue-400">60-74</div>
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-bold text-white">Good</span>
-              </div>
-              <p className="text-sm text-gray-400">
-                Solid entertainment value - competitive matches with decent quality and moments of excitement
-              </p>
-            </div>
-          </div>
-
-          <div className="h-px bg-dark-700"></div>
-
-          <div className="flex items-center gap-4">
-            <div className="w-16 text-center">
-              <div className="text-2xl font-black text-gray-500">{'<60'}</div>
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-bold text-gray-400">Average</span>
-              </div>
-              <p className="text-sm text-gray-400">
-                Standard matches - may lack excitement or have defensive/slow-paced gameplay
-              </p>
-            </div>
-          </div>
+            </React.Fragment>
+          ))}
         </div>
       </div>
 
       {/* How It Works */}
-      <div className="bg-gradient-to-br from-dark-800 to-dark-900 border border-dark-700 rounded-xl p-8 mb-12">
-        <h2 className="text-2xl font-black text-white mb-6 text-center">How It Works</h2>
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-pitch-600/20 rounded-full mb-4">
-              <span className="text-2xl font-black text-pitch-400">1</span>
+      <div className="bg-dark-800 border border-white/[0.06] rounded-xl p-6 mb-10">
+        <h2 className="text-xl font-bold text-white mb-6 text-center">How It Works</h2>
+        <div className="grid md:grid-cols-3 gap-6">
+          {[
+            { step: '1', title: 'Browse Matches', desc: 'Explore live, upcoming, and recent matches from top leagues', color: 'bg-pitch-600/15 text-pitch-400' },
+            { step: '2', title: 'Check Watchability', desc: 'See AI-powered ratings for entertainment and quality', color: 'bg-orange-600/15 text-orange-400' },
+            { step: '3', title: 'Follow & Track', desc: 'Save favorites, explore teams, get recommendations', color: 'bg-blue-600/15 text-blue-400' },
+          ].map(s => (
+            <div key={s.step} className="text-center">
+              <div className={`inline-flex items-center justify-center w-12 h-12 ${s.color} rounded-full mb-3`}>
+                <span className="text-lg font-bold">{s.step}</span>
+              </div>
+              <h3 className="font-semibold text-white mb-1">{s.title}</h3>
+              <p className="text-sm text-zinc-500">{s.desc}</p>
             </div>
-            <h3 className="font-bold text-white mb-2">Browse Matches</h3>
-            <p className="text-sm text-gray-400">
-              Explore live, upcoming, and recent matches from top leagues worldwide
-            </p>
-          </div>
-
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-600/20 rounded-full mb-4">
-              <span className="text-2xl font-black text-orange-400">2</span>
-            </div>
-            <h3 className="font-bold text-white mb-2">Check Watchability</h3>
-            <p className="text-sm text-gray-400">
-              See AI-powered ratings for match entertainment and quality
-            </p>
-          </div>
-
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600/20 rounded-full mb-4">
-              <span className="text-2xl font-black text-blue-400">3</span>
-            </div>
-            <h3 className="font-bold text-white mb-2">Follow & Track</h3>
-            <p className="text-sm text-gray-400">
-              Save favorites, explore teams, and get personalized recommendations
-            </p>
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* Additional Features */}
-      <div className="grid md:grid-cols-3 gap-6 mb-12">
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 hover:border-pitch-500/50 transition-all duration-300">
-          <Clock className="text-pitch-400 mb-4" size={28} />
-          <h3 className="text-lg font-black text-white mb-2">Real-Time Data</h3>
-          <p className="text-gray-300 text-sm leading-relaxed">
-            Live scores, lineups, and match events updated in real-time from trusted sources.
-          </p>
-        </div>
-
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 hover:border-pitch-500/50 transition-all duration-300">
-          <Brain className="text-pitch-400 mb-4" size={28} />
-          <h3 className="text-lg font-black text-white mb-2">Smart Insights</h3>
-          <p className="text-gray-300 text-sm leading-relaxed">
-            AI-powered analysis of player form, team quality, and tactical matchups.
-          </p>
-        </div>
-
-        <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 hover:border-pitch-500/50 transition-all duration-300">
-          <Trophy className="text-pitch-400 mb-4" size={28} />
-          <h3 className="text-lg font-black text-white mb-2">Multi-League</h3>
-          <p className="text-gray-300 text-sm leading-relaxed">
-            Coverage across Premier League, La Liga, Serie A, Bundesliga, and more.
-          </p>
-        </div>
+      {/* Additional features */}
+      <div className="grid md:grid-cols-3 gap-4 mb-10">
+        {[
+          { icon: <Clock className="text-pitch-400" size={22} />, title: 'Real-Time Data', desc: 'Live scores, lineups, and events updated in real-time.' },
+          { icon: <Brain className="text-pitch-400" size={22} />, title: 'Smart Insights', desc: 'AI analysis of player form, team quality, and tactics.' },
+          { icon: <Trophy className="text-pitch-400" size={22} />, title: 'Multi-League', desc: 'Premier League, La Liga, Serie A, Bundesliga, and more.' },
+        ].map(f => (
+          <div key={f.title} className="bg-dark-800 border border-white/[0.06] rounded-xl p-5 hover:border-white/[0.1] transition">
+            <div className="mb-3">{f.icon}</div>
+            <h3 className="text-base font-bold text-white mb-1">{f.title}</h3>
+            <p className="text-zinc-500 text-sm">{f.desc}</p>
+          </div>
+        ))}
       </div>
 
       {/* Footer */}
-      <div className="text-center pt-8 border-t border-dark-700">
-        <div className="inline-flex items-center gap-2 mb-4">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pitch-600 to-green-300 flex items-center justify-center">
-            <span className="font-bold text-dark-900 text-lg">F</span>
+      <div className="text-center pt-6 border-t border-white/[0.06]">
+        <div className="inline-flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 rounded-lg bg-pitch-600 flex items-center justify-center">
+            <span className="font-black text-white text-sm">F</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-xl text-white">FullTime</span>
-            <span className="px-2 py-0.5 text-[10px] font-black uppercase bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-full">
-              Beta
-            </span>
-          </div>
+          <span className="font-bold text-lg text-white">FullTime</span>
         </div>
-        <p className="text-gray-400 text-sm mb-2">
-          Built with <span className="text-pitch-400">♥</span> using Google Gemini AI, React, TypeScript, and Firebase
-        </p>
-        <p className="text-gray-500 text-xs mb-4">
-          Match data from API-Football • AI analysis powered by Gemini 2.0
-        </p>
-        <div className="flex items-center justify-center gap-4 text-xs text-gray-500">
-          <span>v1.0.0-beta</span>
-          <span>•</span>
-          <span>© 2026 FullTime</span>
-          <span>•</span>
-          <span>All Rights Reserved</span>
-        </div>
+        <p className="text-zinc-500 text-sm mb-1">Built with Gemini AI, React, TypeScript, and Firebase</p>
+        <p className="text-zinc-600 text-xs">v1.0.0-beta · 2026 FullTime</p>
       </div>
     </div>
   );

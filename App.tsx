@@ -81,7 +81,6 @@ const App: React.FC = () => {
         setView('DETAILS');
       }
 
-      // Extract league from URL params
       const urlParams = new URLSearchParams(window.location.search);
       const leagueParam = urlParams.get('league');
       if (leagueParam && Object.values(League).includes(leagueParam as League)) {
@@ -91,12 +90,10 @@ const App: React.FC = () => {
 
     syncViewFromUrl();
 
-    // Listen for browser back/forward
     window.addEventListener('popstate', syncViewFromUrl);
     return () => window.removeEventListener('popstate', syncViewFromUrl);
   }, []);
 
-  // Update URL when view changes
   const updateUrl = useCallback((newView: typeof view, params?: Record<string, string>) => {
     const urlMap = {
       'HOME': '/',
@@ -116,7 +113,7 @@ const App: React.FC = () => {
 
     window.history.pushState({}, '', url);
   }, []);
-  
+
   const [featuredMatches, setFeaturedMatches] = useState<Match[]>(INITIAL_LIVE_MATCHES);
   const [excitingMatches, setExcitingMatches] = useState<Match[]>(INITIAL_EXCITING_MATCHES);
   const [highestScoringMatches, setHighestScoringMatches] = useState<Match[]>(INITIAL_HIGHEST_SCORING_MATCHES);
@@ -127,12 +124,11 @@ const App: React.FC = () => {
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  
+
   const [leagueMetrics, setLeagueMetrics] = useState<LeagueMetric[]>([]);
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [userReviews, setUserReviews] = useState<Review[]>([]);
 
-  // Letterboxd-style features
   const [recentActivity, setRecentActivity] = useState<Review[]>([]);
   const [popularLists, setPopularLists] = useState<Playlist[]>([]);
   const [communityStats, setCommunityStats] = useState({
@@ -162,7 +158,6 @@ const App: React.FC = () => {
         setUser(u);
         fetchPlaylists(firebaseUser.uid);
 
-        // Load user favorites
         const userFavorites = await getUserFavorites(firebaseUser.uid);
         setFavorites(userFavorites);
       } else {
@@ -192,7 +187,7 @@ const App: React.FC = () => {
       const snapshot = await getDocs(q);
       const playlistsData = snapshot.docs.map((d: any) => ({ id: d.id, ...d.data() } as Playlist));
       setPlaylists(playlistsData);
-      setCachedData(cacheKey, playlistsData, 600); // Cache for 10 minutes
+      setCachedData(cacheKey, playlistsData, 600);
     } catch (err) { console.warn(err); }
   }, []);
 
@@ -212,7 +207,6 @@ const App: React.FC = () => {
       const playlist = { id: docRef.id, ...newPlaylist } as Playlist;
       setPlaylists(prev => [...prev, playlist]);
 
-      // Clear cache to force refresh
       const cacheKey = `playlists_${user.id}`;
       setCachedData(cacheKey, [...playlists, playlist], 600);
 
@@ -252,7 +246,6 @@ const App: React.FC = () => {
   const fetchLive = useCallback(async (forceRefresh: boolean = false) => {
     setIsRefreshing(true);
     try {
-        // If forcing refresh, clear all caches
         if (forceRefresh) {
           const cacheKey = `live_v2_${currentLeague || 'all'}`;
           const hybridCacheKey = `hybrid_live_${new Date().toISOString().split('T')[0]}_${currentLeague || 'all'}`;
@@ -264,11 +257,9 @@ const App: React.FC = () => {
 
         let liveData: Match[] = [];
 
-        // TIER 1: Try API-Football first (best real-time coverage)
         console.log('🏆 Tier 1: Trying API-Football (RapidAPI)...');
         liveData = await fetchTodaysFixtures();
 
-        // Filter by league if specified
         if (liveData.length > 0 && currentLeague) {
           liveData = liveData.filter(m => m.league === currentLeague);
         }
@@ -277,7 +268,6 @@ const App: React.FC = () => {
           console.log(`✅ Using API-Football: ${liveData.length} matches loaded`);
         }
 
-        // TIER 2: If API-Football fails, try football-data.org hybrid
         if (liveData.length === 0) {
           console.log('🥈 Tier 2: Trying football-data.org hybrid...');
           liveData = await getHybridLiveMatches(currentLeague || undefined);
@@ -286,7 +276,6 @@ const App: React.FC = () => {
           }
         }
 
-        // TIER 3: If both APIs fail, fall back to AI-only mode
         if (liveData.length === 0) {
           console.log('🥉 Tier 3: Falling back to Gemini AI-only mode...');
           liveData = await getLiveMatches(currentLeague || undefined);
@@ -324,11 +313,10 @@ const App: React.FC = () => {
           const snapshot = await getDocs(q);
           const reviewsData = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Review));
           setReviews(reviewsData);
-          setCachedData(cacheKey, reviewsData, 300); // Cache for 5 minutes
+          setCachedData(cacheKey, reviewsData, 300);
       } catch (err) { setReviews([]); }
   }, []);
 
-  // Fetch recent activity (community reviews) - Letterboxd style
   const fetchRecentActivity = useCallback(async () => {
     const cacheKey = 'recent_activity';
     const cached = getCachedData<Review[]>(cacheKey);
@@ -349,14 +337,13 @@ const App: React.FC = () => {
         ...doc.data()
       } as Review));
       setRecentActivity(activityData);
-      setCachedData(cacheKey, activityData, 300); // Cache for 5 minutes
+      setCachedData(cacheKey, activityData, 300);
     } catch (err) {
       console.warn('Failed to fetch recent activity:', err);
       setRecentActivity([]);
     }
   }, []);
 
-  // Fetch popular lists (community playlists) - Letterboxd style
   const fetchPopularLists = useCallback(async () => {
     const cacheKey = 'popular_lists';
     const cached = getCachedData<Playlist[]>(cacheKey);
@@ -372,21 +359,19 @@ const App: React.FC = () => {
         orderBy('createdAt', 'desc')
       );
       const snapshot = await getDocs(q);
-      // Sort by number of matches (most popular)
       const listsData = snapshot.docs
         .map((doc: any) => ({ id: doc.id, ...doc.data() } as Playlist))
         .filter(p => p.matchIds && p.matchIds.length > 0)
         .sort((a, b) => (b.matchIds?.length || 0) - (a.matchIds?.length || 0))
         .slice(0, 6);
       setPopularLists(listsData);
-      setCachedData(cacheKey, listsData, 600); // Cache for 10 minutes
+      setCachedData(cacheKey, listsData, 600);
     } catch (err) {
       console.warn('Failed to fetch popular lists:', err);
       setPopularLists([]);
     }
   }, []);
 
-  // Fetch community stats
   const fetchCommunityStats = useCallback(async () => {
     const cacheKey = 'community_stats';
     const cached = getCachedData<typeof communityStats>(cacheKey);
@@ -413,29 +398,23 @@ const App: React.FC = () => {
       };
 
       setCommunityStats(stats);
-      setCachedData(cacheKey, stats, 1800); // Cache for 30 minutes
+      setCachedData(cacheKey, stats, 1800);
     } catch (err) {
       console.warn('Failed to fetch community stats:', err);
     }
   }, []);
 
-  // Progressive data loading - load in stages for faster initial render
   useEffect(() => {
-    // Stage 1: Load cached live matches immediately
     fetchLive(false);
 
-    // Stage 2: Load other matches progressively (API-first with Gemini fallback)
     setTimeout(async () => {
       try {
         console.log('🎯 Fetching exciting matches from API...');
         let exciting = await getExcitingMatchesFromAPI();
-
-        // Fallback to Gemini if API fails
         if (exciting.length === 0) {
           console.log('🤖 API returned no data, falling back to Gemini...');
           exciting = await getExcitingMatches();
         }
-
         setExcitingMatches(exciting);
       } catch (err) {
         console.error('Failed to load exciting matches:', err);
@@ -447,13 +426,10 @@ const App: React.FC = () => {
       try {
         console.log('🎯 Fetching highest scoring matches from API...');
         let highScoring = await getHighestScoringMatchesFromAPI();
-
-        // Fallback to Gemini if API fails
         if (highScoring.length === 0) {
           console.log('🤖 API returned no data, falling back to Gemini...');
           highScoring = await getHighestScoringMatches();
         }
-
         setHighestScoringMatches(highScoring);
       } catch (err) {
         console.error('Failed to load highest scoring matches:', err);
@@ -461,18 +437,14 @@ const App: React.FC = () => {
       }
     }, 200);
 
-    // Stage 3: Load exciting players (API-first with Gemini fallback)
     setTimeout(async () => {
       try {
         console.log('🎯 Fetching top players from API...');
         let players = await getTopPlayersFromAPI();
-
-        // Fallback to Gemini if API fails
         if (players.length === 0) {
           console.log('🤖 API returned no data, falling back to Gemini...');
           players = await getExcitingPlayers();
         }
-
         setExcitingPlayers(players);
       } catch (err) {
         console.error('Failed to load top players:', err);
@@ -480,7 +452,6 @@ const App: React.FC = () => {
       }
     }, 300);
 
-    // Stage 4: Load upcoming matches
     setTimeout(async () => {
       try {
         console.log('📅 Fetching upcoming matches...');
@@ -491,7 +462,6 @@ const App: React.FC = () => {
       }
     }, 350);
 
-    // Stage 5: Load Letterboxd-style community features
     setTimeout(() => {
       console.log('👥 Fetching community activity...');
       fetchRecentActivity();
@@ -499,17 +469,11 @@ const App: React.FC = () => {
       fetchCommunityStats();
     }, 450);
 
-    // Stage 6: Real-time live match updates (like SofaScore)
-    // Check for live matches every 30 seconds
     const liveInterval = setInterval(async () => {
       console.log('⚽ Checking for live match updates...');
-
       try {
-        // Fetch only live fixtures from API-Football
         const liveMatches = await fetchLiveFixtures();
-
         if (liveMatches.length > 0) {
-          // Update featured matches with latest live data
           setFeaturedMatches(prev => {
             const nonLiveMatches = prev.filter(m => m.status !== 'LIVE');
             return [...liveMatches, ...nonLiveMatches];
@@ -519,36 +483,32 @@ const App: React.FC = () => {
       } catch (error) {
         console.error('Failed to update live matches:', error);
       }
-    }, 30000); // 30 seconds for live matches
+    }, 30000);
 
-    // Stage 7: Full refresh every 3 minutes for non-live matches
     const fullRefreshInterval = setInterval(() => {
       console.log('🔄 Auto-refreshing all matches in background...');
-      fetchLive(false); // Don't show toast for auto-refresh
-    }, 180000); // 3 minutes
+      fetchLive(false);
+    }, 180000);
 
     return () => {
       clearInterval(liveInterval);
       clearInterval(fullRefreshInterval);
     };
-  }, [currentLeague]); // Re-fetch when league changes
+  }, [currentLeague]);
 
   const handleSearch = useCallback(async (query: string) => {
     setIsLoading(true); setView('SEARCH');
     try {
       console.log(`🔍 Searching API for "${query}"...`);
       let results = await searchFromAPI(query);
-
-      // Fallback to Gemini if API returns no results
       if (results.length === 0) {
         console.log('🤖 No API results, falling back to Gemini search...');
         results = await searchEntities(query);
       }
-
       setSearchResults(results);
     } catch (err) {
       console.error('Search failed:', err);
-      setSearchResults(await searchEntities(query)); // Fallback to Gemini
+      setSearchResults(await searchEntities(query));
     }
     finally { setIsLoading(false); }
   }, []);
@@ -557,14 +517,11 @@ const App: React.FC = () => {
     setSelectedEntity(entity); setView('DETAILS');
     window.scrollTo(0, 0); fetchReviews(entity.id);
 
-    // If it's a match, fetch lineups (real or predicted)
     if (entity.type === 'MATCH' && 'homeTeam' in entity && 'awayTeam' in entity) {
       try {
         console.log(`📋 Fetching lineups for ${entity.homeTeam} vs ${entity.awayTeam}...`);
-
         let lineupData = null;
 
-        // If it's from API-Football, try to get enriched lineups (real or predicted)
         if (entity.id.startsWith('apif_')) {
           const fixtureId = extractFixtureId(entity.id);
           if (fixtureId) {
@@ -577,7 +534,6 @@ const App: React.FC = () => {
           }
         }
 
-        // If no lineup data yet (non-API match or API failed), generate predicted lineups
         if (!lineupData) {
           console.log('⚠️ No API lineups available, generating predicted lineups...');
           const { getPredictedLineups, calculateLineupWatchability } = await import('./services/predictedLineupsService');
@@ -602,7 +558,6 @@ const App: React.FC = () => {
         }
 
         if (lineupData) {
-          // Update the selected entity with lineups (real or predicted)
           setSelectedEntity(prev => prev ? {
             ...prev,
             lineups: {
@@ -722,7 +677,6 @@ const App: React.FC = () => {
       const docRef = await addDoc(collection(db, 'reviews'), review);
       console.log('Review saved with ID:', docRef.id);
 
-      // Add to reviews state
       setReviews(prev => [{ id: docRef.id, ...review }, ...prev]);
 
       success("Review submitted successfully!");
@@ -768,24 +722,17 @@ const App: React.FC = () => {
     }
   }, [user, favorites, success, showError]);
 
-  // Filter matches by league and date
   const filteredFeaturedMatches = useMemo(() => {
     let matches = featuredMatches;
-
-    // Filter by league
     if (currentLeague) {
       matches = matches.filter(m => m.league === currentLeague);
     }
-
-    // Filter by date
     if (dateFilter === 'today') {
       const today = new Date().toISOString().split('T')[0];
       matches = matches.filter(m => {
-        // Assuming matches have a date field or we can extract from the match data
-        return true; // For now, keep all matches
+        return true;
       });
     }
-
     return matches;
   }, [featuredMatches, currentLeague, dateFilter]);
 
@@ -807,22 +754,19 @@ const App: React.FC = () => {
       : upcomingMatches;
   }, [upcomingMatches, currentLeague]);
 
-  // Filter matches featuring favorite teams
   const filteredFavoriteMatches = useMemo(() => {
     if (favorites.teams.length === 0) return [];
-
     const allMatches = [...featuredMatches, ...excitingMatches, ...highestScoringMatches];
     const uniqueMatches = Array.from(new Map(allMatches.map(m => [m.id, m])).values());
-
     return uniqueMatches.filter(match =>
       favorites.teams.some(team =>
         match.homeTeam === team || match.awayTeam === team
       )
-    ).slice(0, 8); // Limit to 8 matches
+    ).slice(0, 8);
   }, [featuredMatches, excitingMatches, highestScoringMatches, favorites.teams]);
 
   return (
-    <div className="min-h-screen bg-dark-900 font-sans text-gray-100 relative">
+    <div className="min-h-screen bg-dark-900 font-sans text-zinc-100 relative">
       <Header
          user={user}
          onLogin={signInWithGoogle}
@@ -834,11 +778,10 @@ const App: React.FC = () => {
          onViewLeagues={handleViewLeagues}
          onViewAbout={handleViewAbout}
       />
-      
+
       <main className="max-w-7xl mx-auto px-4 py-8">
          {view === 'HOME' && (
            <div className="space-y-12">
-              {/* Hero/Signup Section */}
               {!user && (
                 <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-pitch-900 via-pitch-800 to-dark-900 border border-pitch-700/50 p-8 md:p-12 mb-16 shadow-2xl">
                   <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/60-lines.png')] opacity-10"></div>
@@ -846,14 +789,14 @@ const App: React.FC = () => {
 
                   <div className="relative z-10 max-w-3xl">
                     <div className="inline-block px-3 py-1 bg-pitch-600/30 border border-pitch-500/50 rounded-full text-xs font-bold text-pitch-300 uppercase tracking-wider mb-4">
-                      Live Match Data • AI-Powered Insights
+                      Live Match Data · AI-Powered Insights
                     </div>
 
                     <h1 className="text-4xl md:text-6xl font-black text-white mb-4 leading-tight">
                       Never Miss a <span className="text-pitch-400">Legendary</span> Match Again
                     </h1>
 
-                    <p className="text-lg md:text-xl text-gray-300 mb-8 leading-relaxed">
+                    <p className="text-lg md:text-xl text-zinc-300 mb-8 leading-relaxed">
                       Get real-time match updates, AI-powered watchability scores, and personalized recommendations.
                       Join the community and discover which matches are truly worth your time.
                     </p>
@@ -868,7 +811,7 @@ const App: React.FC = () => {
                       </button>
                       <button
                         onClick={() => window.scrollTo({ top: 500, behavior: 'smooth' })}
-                        className="bg-dark-800 hover:bg-dark-700 border border-dark-600 text-white font-bold py-4 px-8 rounded-lg transition flex items-center justify-center gap-2 text-lg"
+                        className="bg-dark-800 hover:bg-white/[0.08] border border-white/[0.08] text-white font-bold py-4 px-8 rounded-lg transition flex items-center justify-center gap-2 text-lg"
                       >
                         <TrendingUp size={20} />
                         Explore Matches
@@ -878,22 +821,21 @@ const App: React.FC = () => {
                     <div className="mt-8 grid grid-cols-3 gap-6 pt-6 border-t border-white/10">
                       <div>
                         <div className="text-3xl font-black text-pitch-400 mb-1">Live</div>
-                        <div className="text-xs text-gray-400 uppercase tracking-wider">Updates</div>
+                        <div className="text-xs text-zinc-400 uppercase tracking-wider">Updates</div>
                       </div>
                       <div>
                         <div className="text-3xl font-black text-pitch-400 mb-1">AI</div>
-                        <div className="text-xs text-gray-400 uppercase tracking-wider">Powered</div>
+                        <div className="text-xs text-zinc-400 uppercase tracking-wider">Powered</div>
                       </div>
                       <div>
                         <div className="text-3xl font-black text-pitch-400 mb-1">Free</div>
-                        <div className="text-xs text-gray-400 uppercase tracking-wider">Forever</div>
+                        <div className="text-xs text-zinc-400 uppercase tracking-wider">Forever</div>
                       </div>
                     </div>
                   </div>
                 </section>
               )}
 
-              {/* Favorite Teams Section */}
               {user && filteredFavoriteMatches.length > 0 && (
                 <section>
                   <div className="flex items-center gap-2 mb-6 border-l-4 border-yellow-500 pl-4">
@@ -912,18 +854,18 @@ const App: React.FC = () => {
                 <div className="flex justify-between items-center mb-6 border-l-4 border-pitch-500 pl-4">
                   <h2 className="text-xl font-bold text-white uppercase tracking-widest">
                     Happening Now
-                    {isRefreshing && <span className="ml-2 text-xs text-pitch-400 animate-pulse">• Live</span>}
+                    {isRefreshing && <span className="ml-2 text-xs text-pitch-400 animate-pulse">· Live</span>}
                   </h2>
                   <button
                     onClick={() => fetchLive(true)}
                     disabled={isRefreshing}
-                    className="text-xs text-gray-500 hover:text-pitch-400 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    className="text-xs text-zinc-500 hover:text-pitch-400 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed transition"
                   >
                     <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
                     {isRefreshing ? 'Refreshing...' : 'Refresh'}
                   </button>
                 </div>
-                <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-dark-700 scrollbar-track-dark-900 hover:scrollbar-thumb-pitch-600">
+                <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory no-scrollbar">
                    {isRefreshing && filteredFeaturedMatches.length === 0 ? (
                      <>
                        <div className="flex-shrink-0 w-80"><LoadingSkeleton type="match" count={1} /></div>
@@ -940,7 +882,7 @@ const App: React.FC = () => {
                         </div>
                      </div>
                    )) : (
-                     <div className="w-full text-center py-12 text-gray-500">
+                     <div className="w-full text-center py-12 text-zinc-500">
                        No matches found for {currentLeague}. Try selecting a different league.
                      </div>
                    )}
@@ -956,7 +898,7 @@ const App: React.FC = () => {
                     {isLoading && filteredExcitingMatches.length === 0 ? (
                       <LoadingSkeleton type="match" count={4} />
                     ) : filteredExcitingMatches.length > 0 ? filteredExcitingMatches.map(m => <EnhancedMatchCard key={m.id} match={m} onClick={() => handleEntityClick(m)} />) : (
-                      <div className="col-span-full text-center py-12 text-gray-500">
+                      <div className="col-span-full text-center py-12 text-zinc-500">
                         No exciting matches found for {currentLeague}.
                       </div>
                     )}
@@ -971,17 +913,12 @@ const App: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
                     {excitingPlayers.map(player => (
-                      <EnhancedPlayerCard
-                        key={player.id}
-                        player={player}
-                        onClick={handleEntityClick}
-                      />
+                      <EnhancedPlayerCard key={player.id} player={player} onClick={handleEntityClick} />
                     ))}
                   </div>
                 </section>
               )}
 
-              {/* Upcoming Matches Section */}
               {filteredUpcomingMatches.length > 0 && (
                 <section>
                   <div className="flex items-center gap-2 mb-6 border-l-4 border-blue-500 pl-4">
@@ -999,15 +936,14 @@ const App: React.FC = () => {
                           <span className="text-[10px] text-blue-400 font-bold uppercase">{m.league}</span>
                           {m.watchability && m.watchability >= 8 && (
                             <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-900/40 border border-orange-600/50 rounded text-[9px] font-bold text-orange-400">
-                              <Flame size={10} />
-                              Hot
+                              <Flame size={10} /> Hot
                             </div>
                           )}
                         </div>
                         <div className="text-center mb-3">
-                          <div className="text-sm font-bold text-gray-200 mb-1 group-hover:text-white transition">{m.homeTeam}</div>
-                          <div className="text-xs text-gray-500 font-bold my-2">VS</div>
-                          <div className="text-sm font-bold text-gray-200 group-hover:text-white transition">{m.awayTeam}</div>
+                          <div className="text-sm font-bold text-zinc-200 mb-1 group-hover:text-white transition">{m.homeTeam}</div>
+                          <div className="text-xs text-zinc-500 font-bold my-2">VS</div>
+                          <div className="text-sm font-bold text-zinc-200 group-hover:text-white transition">{m.awayTeam}</div>
                         </div>
                         <div className="flex items-center justify-center gap-2 text-[10px] text-blue-400 border-t border-blue-900/30 pt-3 mt-3">
                           <Clock size={12} />
@@ -1016,7 +952,7 @@ const App: React.FC = () => {
                         {m.watchability && (
                           <div className="mt-2 text-center">
                             <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
-                              m.watchability >= 8 ? 'bg-pitch-900/40 text-pitch-400' : 'bg-dark-800 text-gray-500'
+                              m.watchability >= 8 ? 'bg-pitch-900/40 text-pitch-400' : 'bg-dark-800 text-zinc-500'
                             }`}>
                               Watchability: {m.watchability.toFixed(1)}
                             </span>
@@ -1028,8 +964,7 @@ const App: React.FC = () => {
                 </section>
               )}
 
-              {/* Community Stats - Letterboxd style */}
-              <section className="bg-gradient-to-r from-dark-800 to-dark-900 border border-dark-700 rounded-xl p-6">
+              <section className="bg-gradient-to-r from-dark-800 to-dark-900 border border-white/[0.06] rounded-xl p-6">
                 <div className="flex items-center gap-2 mb-6">
                   <BarChart3 size={20} className="text-pitch-500" />
                   <h2 className="text-lg font-bold text-white">Community Stats</h2>
@@ -1037,26 +972,25 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   <div className="text-center">
                     <div className="text-3xl font-black text-pitch-400">{communityStats.totalReviews}</div>
-                    <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Reviews</div>
+                    <div className="text-xs text-zinc-400 uppercase tracking-wider mt-1">Reviews</div>
                   </div>
                   <div className="text-center">
                     <div className="text-3xl font-black text-blue-400">{communityStats.totalLists}</div>
-                    <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Lists</div>
+                    <div className="text-xs text-zinc-400 uppercase tracking-wider mt-1">Lists</div>
                   </div>
                   <div className="text-center">
                     <div className="text-3xl font-black text-yellow-400">{communityStats.activeUsers}</div>
-                    <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Active Users</div>
+                    <div className="text-xs text-zinc-400 uppercase tracking-wider mt-1">Active Users</div>
                   </div>
                   <div className="text-center">
                     <div className="text-3xl font-black text-orange-400">
                       <Trophy size={28} className="mx-auto" />
                     </div>
-                    <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">{communityStats.topLeague}</div>
+                    <div className="text-xs text-zinc-400 uppercase tracking-wider mt-1">{communityStats.topLeague}</div>
                   </div>
                 </div>
               </section>
 
-              {/* Recent Activity - Letterboxd style */}
               {recentActivity.length > 0 && (
                 <section>
                   <div className="flex items-center gap-2 mb-6 border-l-4 border-purple-500 pl-4">
@@ -1065,17 +999,17 @@ const App: React.FC = () => {
                   </div>
                   <div className="space-y-4">
                     {recentActivity.slice(0, 5).map(review => (
-                      <div key={review.id} className="bg-dark-800 border border-dark-700 rounded-lg p-4 hover:border-purple-500/50 transition group">
+                      <div key={review.id} className="bg-dark-800 border border-white/[0.06] rounded-lg p-4 hover:border-purple-500/50 transition group">
                         <div className="flex items-start gap-4">
                           <img
                             src={review.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(review.userName)}&background=random`}
                             alt={review.userName}
-                            className="w-10 h-10 rounded-full border-2 border-dark-600"
+                            className="w-10 h-10 rounded-full border-2 border-white/[0.08]"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-bold text-white">{review.userName}</span>
-                              <span className="text-gray-500 text-xs">reviewed</span>
+                              <span className="text-zinc-500 text-xs">reviewed</span>
                               <span className="text-pitch-400 font-medium truncate">{review.entityName || 'a match'}</span>
                             </div>
                             <div className="flex items-center gap-1 mb-2">
@@ -1083,12 +1017,12 @@ const App: React.FC = () => {
                                 <Star
                                   key={star}
                                   size={14}
-                                  className={star <= review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-600'}
+                                  className={star <= review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-zinc-600'}
                                 />
                               ))}
                             </div>
-                            <p className="text-gray-300 text-sm line-clamp-2">{review.comment}</p>
-                            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                            <p className="text-zinc-300 text-sm line-clamp-2">{review.comment}</p>
+                            <div className="flex items-center gap-4 mt-2 text-xs text-zinc-500">
                               <span className="flex items-center gap-1">
                                 <Clock size={12} />
                                 {new Date(review.createdAt).toLocaleDateString()}
@@ -1106,7 +1040,6 @@ const App: React.FC = () => {
                 </section>
               )}
 
-              {/* Popular Lists - Letterboxd style */}
               {popularLists.length > 0 && (
                 <section>
                   <div className="flex items-center gap-2 mb-6 border-l-4 border-blue-500 pl-4">
@@ -1115,8 +1048,7 @@ const App: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {popularLists.map(list => (
-                      <div key={list.id} className="bg-dark-800 border border-dark-700 rounded-xl overflow-hidden hover:border-blue-500/50 transition group cursor-pointer">
-                        {/* List cover - stack of match gradients */}
+                      <div key={list.id} className="bg-dark-800 border border-white/[0.06] rounded-xl overflow-hidden hover:border-blue-500/50 transition group cursor-pointer">
                         <div className="relative h-24 overflow-hidden">
                           <div className="absolute inset-0 flex">
                             {list.matchIds.slice(0, 4).map((matchId, i) => (
@@ -1131,8 +1063,8 @@ const App: React.FC = () => {
                         </div>
                         <div className="p-4">
                           <h3 className="font-bold text-white mb-1 group-hover:text-blue-400 transition">{list.name}</h3>
-                          <p className="text-xs text-gray-400 line-clamp-2 mb-3">{list.description}</p>
-                          <div className="flex items-center justify-between text-xs text-gray-500">
+                          <p className="text-xs text-zinc-400 line-clamp-2 mb-3">{list.description}</p>
+                          <div className="flex items-center justify-between text-xs text-zinc-500">
                             <span className="flex items-center gap-1">
                               <ListPlus size={12} />
                               {list.matchIds.length} matches
@@ -1149,11 +1081,10 @@ const App: React.FC = () => {
                 </section>
               )}
 
-              {/* Call to Action for non-logged in users */}
               {!user && (
                 <section className="bg-gradient-to-br from-pitch-900/50 to-dark-900 border border-pitch-700/30 rounded-xl p-8 text-center">
                   <h3 className="text-2xl font-bold text-white mb-3">Join the Community</h3>
-                  <p className="text-gray-400 mb-6 max-w-lg mx-auto">
+                  <p className="text-zinc-400 mb-6 max-w-lg mx-auto">
                     Create lists, rate matches, and share your football journey with fans around the world.
                   </p>
                   <button
@@ -1173,20 +1104,20 @@ const App: React.FC = () => {
              {isLoading ? (
                <div className="flex flex-col items-center justify-center py-20">
                  <Loader2 className="animate-spin text-pitch-500 mb-4" size={48} />
-                 <p className="text-gray-400 text-sm">Searching...</p>
+                 <p className="text-zinc-400 text-sm">Searching...</p>
                </div>
              ) : searchResults.length > 0 ? (
                <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                  {searchResults.map(e => (
-                   <div key={e.id} onClick={() => handleEntityClick(e)} className="cursor-pointer group bg-dark-800 rounded p-2 border border-dark-700 hover:border-pitch-500 transition">
+                   <div key={e.id} onClick={() => handleEntityClick(e)} className="cursor-pointer group bg-dark-800 rounded p-2 border border-white/[0.06] hover:border-pitch-500 transition">
                      <div className="aspect-[3/4] rounded overflow-hidden mb-2"><img src={e.image} className="w-full h-full object-cover"/></div>
                      <div className="text-sm font-bold text-white truncate">{e.name}</div>
-                     <div className="text-[10px] text-gray-500 uppercase">{e.type}</div>
+                     <div className="text-[10px] text-zinc-500 uppercase">{e.type}</div>
                    </div>
                  ))}
                </div>
              ) : (
-               <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+               <div className="flex flex-col items-center justify-center py-20 text-zinc-500">
                  <AlertCircle size={48} className="mb-4" />
                  <p>No results found. Try a different search.</p>
                </div>
@@ -1216,7 +1147,6 @@ const App: React.FC = () => {
                isOwnProfile={user?.id === profileUser.id}
                onEntityClick={(id: string) => handleEntityClick({ id, name: '...', type: 'MATCH', image: getGenericImage(id)})}
                onMatchClick={(id: string) => {
-                 // Find the full match object from state
                  const allMatches = [...featuredMatches, ...excitingMatches, ...highestScoringMatches];
                  const match = allMatches.find(m => m.id === id);
                  if (match) {
@@ -1254,28 +1184,27 @@ const App: React.FC = () => {
          )}
       </main>
 
-      {/* Playlist Modal */}
       {isPlaylistModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-           <div className="bg-dark-800 border border-dark-700 rounded-lg w-full max-w-sm p-6 space-y-4">
+           <div className="bg-dark-800 border border-white/[0.06] rounded-lg w-full max-w-sm p-6 space-y-4">
               <div className="flex justify-between items-center">
                  <h3 className="font-bold text-white">Add to List</h3>
-                 <button onClick={() => setIsPlaylistModalOpen(false)}><X size={18}/></button>
+                 <button onClick={() => setIsPlaylistModalOpen(false)} className="text-zinc-500 hover:text-white transition"><X size={18}/></button>
               </div>
               <div className="space-y-2 max-h-60 overflow-y-auto">
                  {playlists.map(p => (
-                    <button 
-                      key={p.id} 
+                    <button
+                      key={p.id}
                       onClick={() => handleAddToPlaylist(p.id, playlistMatchId!)}
-                      className="w-full text-left p-3 rounded bg-dark-900 border border-dark-700 hover:border-pitch-500 transition flex justify-between items-center"
+                      className="w-full text-left p-3 rounded bg-dark-900 border border-white/[0.06] hover:border-pitch-500 transition flex justify-between items-center"
                     >
                        <span className="text-sm">{p.name}</span>
-                       <span className="text-[10px] text-gray-500">{p.matchIds.length} items</span>
+                       <span className="text-[10px] text-zinc-500">{p.matchIds.length} items</span>
                     </button>
                  ))}
-                 <button 
+                 <button
                   onClick={() => { const n = prompt("List Name?"); if(n) handleCreatePlaylist(n); }}
-                  className="w-full p-3 rounded border border-dashed border-dark-600 text-gray-500 text-sm hover:text-white transition"
+                  className="w-full p-3 rounded border border-dashed border-white/[0.08] text-zinc-500 text-sm hover:text-white transition"
                  >
                    + Create New List
                  </button>
@@ -1290,7 +1219,6 @@ const App: React.FC = () => {
         </Suspense>
       )}
 
-      {/* Toast Notifications */}
       {toasts.map(toast => (
         <Toast
           key={toast.id}
