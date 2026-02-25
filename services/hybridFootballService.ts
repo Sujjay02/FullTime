@@ -8,7 +8,7 @@ import { fetchTodaysMatches } from './footballDataApi';
 import { GoogleGenAI, Type } from "@google/genai";
 import { getCachedData, setCachedData } from './cacheService';
 
-const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 const ai = new GoogleGenAI({ apiKey: apiKey || '' });
 const modelName = "gemini-3-flash-preview";
 

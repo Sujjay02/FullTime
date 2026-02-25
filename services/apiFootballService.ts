@@ -11,6 +11,19 @@ import { getGenericImage } from '../constants';
 const API_BASE_URL = 'https://v3.football.api-sports.io';
 const API_KEY = import.meta.env.VITE_API_FOOTBALL_KEY || '';
 
+// Request deduplication - prevent multiple identical in-flight API calls
+const pendingRequests = new Map<string, Promise<any>>();
+
+const dedupedFetch = async <T>(key: string, fetcher: () => Promise<T>): Promise<T> => {
+  if (pendingRequests.has(key)) {
+    console.log(`♻️ Reusing pending API-Football request: ${key}`);
+    return pendingRequests.get(key) as Promise<T>;
+  }
+  const promise = fetcher().finally(() => pendingRequests.delete(key));
+  pendingRequests.set(key, promise);
+  return promise;
+};
+
 interface ApiFixture {
   fixture: {
     id: number;
@@ -163,9 +176,11 @@ export const fetchTodaysFixtures = async (): Promise<Match[]> => {
     return [];
   }
 
-  // Check cache first (cache for 2 minutes to save API calls)
   const today = new Date().toISOString().split('T')[0];
   const cacheKey = `apif_today_${today}`;
+
+  return dedupedFetch(cacheKey, async () => {
+  // Check cache first (cache for 2 minutes to save API calls)
   const cached = localStorage.getItem(cacheKey);
 
   if (cached) {
@@ -264,6 +279,7 @@ export const fetchTodaysFixtures = async (): Promise<Match[]> => {
     console.error('❌ API-Football error:', error);
     return [];
   }
+  }); // end dedupedFetch
 };
 
 /**
@@ -403,7 +419,8 @@ export const fetchUpcomingFixtures = async (): Promise<Match[]> => {
       48, 45, 46, 143, 556, 81, 137, 547, 66, 65  // Cups
     ];
 
-    for (const date of dates) {
+    // Fetch all 3 days in parallel instead of sequentially
+    const fetchDay = async (date: string): Promise<Match[]> => {
       try {
         const response = await fetch(`${API_BASE_URL}/fixtures?date=${date}`, {
           headers: {
@@ -412,12 +429,12 @@ export const fetchUpcomingFixtures = async (): Promise<Match[]> => {
           }
         });
 
-        if (!response.ok) continue;
+        if (!response.ok) return [];
 
         const data = await response.json();
         const fixtures: ApiFixture[] = data.response || [];
 
-        const matches: Match[] = fixtures
+        return fixtures
           .filter(f => includedLeagueIds.includes(f.league.id))
           .filter(f => f.fixture.status.short === 'NS' || f.fixture.status.short === 'TBD')
           .map((fixture) => {
@@ -427,7 +444,6 @@ export const fetchUpcomingFixtures = async (): Promise<Match[]> => {
 
             const matchId = `apif_${fixture.fixture.id}`;
 
-            // Calculate upcoming match watchability based on teams
             let watchability = 6.0;
             const bigTeams = [
               'Manchester United', 'Manchester City', 'Liverpool', 'Arsenal', 'Chelsea', 'Tottenham',
@@ -461,11 +477,15 @@ export const fetchUpcomingFixtures = async (): Promise<Match[]> => {
               formation: { home: '4-3-3', away: '4-3-3' }
             };
           });
-
-        allMatches.push(...matches);
       } catch (err) {
         console.error(`Failed to fetch fixtures for ${date}:`, err);
+        return [];
       }
+    };
+
+    const dayResults = await Promise.all(dates.map(fetchDay));
+    for (const matches of dayResults) {
+      allMatches.push(...matches);
     }
 
     // Sort by watchability and take top 12

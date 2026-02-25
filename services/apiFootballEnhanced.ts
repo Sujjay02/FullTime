@@ -4,7 +4,7 @@
  * Gemini AI used only as fallback
  */
 
-import { Match, League, MatchStatus, Entity, Player } from '../types';
+import { Match, League, MatchStatus, Entity } from '../types';
 import { fetchTodaysFixtures, fetchLiveFixtures } from './apiFootballService';
 import { getGenericImage } from '../constants';
 
@@ -114,7 +114,7 @@ export const getExcitingMatchesFromAPI = async (): Promise<Match[]> => {
     try {
       const { data, timestamp } = JSON.parse(cached);
       const age = Date.now() - timestamp;
-      if (age < 3600000) { // 1 hour cache for historical data
+      if (age < 1800000) { // 30 min cache for exciting matches
         console.log('✅ Using cached exciting matches (past week highlights)');
         return data;
       }
@@ -145,9 +145,9 @@ export const getExcitingMatchesFromAPI = async (): Promise<Match[]> => {
 
     const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
-    // Fetch finished matches from priority leagues only (3 API calls instead of 7)
-    for (const leagueId of priorityLeagues) {
-      try {
+    // Fetch finished matches from priority leagues in parallel (3 concurrent API calls)
+    const leagueResults = await Promise.allSettled(
+      priorityLeagues.map(async (leagueId) => {
         const response = await fetch(
           `${API_BASE_URL}/fixtures?league=${leagueId}&season=${today.getFullYear()}&from=${formatDate(threeDaysAgo)}&to=${formatDate(today)}&status=FT`,
           {
@@ -158,44 +158,50 @@ export const getExcitingMatchesFromAPI = async (): Promise<Match[]> => {
           }
         );
 
-        if (response.ok) {
-          const data = await response.json();
-          const fixtures = data.response || [];
+        if (!response.ok) return [];
 
-          fixtures.forEach((fixture: any) => {
-            const homeScore = fixture.goals.home ?? 0;
-            const awayScore = fixture.goals.away ?? 0;
-            const totalGoals = homeScore + awayScore;
+        const data = await response.json();
+        const fixtures = data.response || [];
+        const matches: Match[] = [];
 
-            // Only include matches with at least 2 goals
-            if (totalGoals >= 2) {
-              const watchability = calculateWatchability({
-                goalsHome: homeScore,
-                goalsAway: awayScore,
-                status: 'FT',
-                leagueId: leagueId,
-                homeTeam: fixture.teams.home.name,
-                awayTeam: fixture.teams.away.name
-              });
+        fixtures.forEach((fixture: any) => {
+          const homeScore = fixture.goals.home ?? 0;
+          const awayScore = fixture.goals.away ?? 0;
+          const totalGoals = homeScore + awayScore;
 
-              allMatches.push({
-                id: `apif_${fixture.fixture.id}`,
-                name: `${fixture.teams.home.name} vs ${fixture.teams.away.name}`,
-                type: 'MATCH' as const,
-                homeTeam: fixture.teams.home.name,
-                awayTeam: fixture.teams.away.name,
-                score: `${homeScore}-${awayScore}`,
-                league: leagueNames[leagueId] || 'League',
-                status: 'FT' as MatchStatus,
-                minute: 'FT',
-                watchability,
-                image: getGenericImage(`apif_${fixture.fixture.id}`)
-              });
-            }
-          });
-        }
-      } catch (err) {
-        console.error(`Failed to fetch from league ${leagueId}:`, err);
+          if (totalGoals >= 2) {
+            const watchability = calculateWatchability({
+              goalsHome: homeScore,
+              goalsAway: awayScore,
+              status: 'FT',
+              leagueId: leagueId,
+              homeTeam: fixture.teams.home.name,
+              awayTeam: fixture.teams.away.name
+            });
+
+            matches.push({
+              id: `apif_${fixture.fixture.id}`,
+              name: `${fixture.teams.home.name} vs ${fixture.teams.away.name}`,
+              type: 'MATCH' as const,
+              homeTeam: fixture.teams.home.name,
+              awayTeam: fixture.teams.away.name,
+              score: `${homeScore}-${awayScore}`,
+              league: leagueNames[leagueId] || 'League',
+              status: 'FT' as MatchStatus,
+              minute: 'FT',
+              watchability,
+              image: getGenericImage(`apif_${fixture.fixture.id}`)
+            });
+          }
+        });
+
+        return matches;
+      })
+    );
+
+    for (const result of leagueResults) {
+      if (result.status === 'fulfilled') {
+        allMatches.push(...result.value);
       }
     }
 
@@ -327,7 +333,7 @@ export const getTopPlayersFromAPI = async (): Promise<Entity[]> => {
     try {
       const { data, timestamp } = JSON.parse(cached);
       const age = Date.now() - timestamp;
-      if (age < 3600000) { // 1 hour cache
+      if (age < 1800000) { // 30 min cache
         console.log('✅ Using cached top players');
         return data;
       }

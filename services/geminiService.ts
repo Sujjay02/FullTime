@@ -3,8 +3,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Entity, EntityType, Match, MatchStatus, League } from "../types";
 import { getGenericImage } from "../constants";
 
-// Initialize Gemini API client strictly with process.env.API_KEY following guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Initialize Gemini API client with Vite env vars
+const geminiApiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+const ai = new GoogleGenAI({ apiKey: geminiApiKey });
 const modelName = "gemini-3-flash-preview";
 
 const normalizeLeague = (input: string): string => {
@@ -25,8 +26,7 @@ const handleApiError = (error: any, context: string): never => {
 };
 
 export const searchEntities = async (query: string, context: string = ''): Promise<Entity[]> => {
-  // Use direct check for process.env.API_KEY
-  if (!query || !process.env.API_KEY) return [];
+  if (!query || !geminiApiKey) return [];
   try {
     const response = await ai.models.generateContent({
       model: modelName,
@@ -67,8 +67,7 @@ export const searchEntities = async (query: string, context: string = ''): Promi
 };
 
 export const getLiveMatches = async (): Promise<Match[]> => {
-  // Use direct check for process.env.API_KEY
-  if (!process.env.API_KEY) return [];
+  if (!geminiApiKey) return [];
   try {
     const now = new Date().toLocaleString('en-US', { timeZone: 'UTC' });
     const response = await ai.models.generateContent({

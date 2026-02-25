@@ -4,8 +4,8 @@ import { Entity, EntityType, Match, MatchStatus, League, LeagueMetric } from "..
 import { getCachedData, setCachedData } from "./cacheService";
 import { INITIAL_LIVE_MATCHES, INITIAL_EXCITING_MATCHES, INITIAL_HIGHEST_SCORING_MATCHES, INITIAL_LEAGUE_METRICS, getGenericImage } from "../constants";
 
-// Initialize Gemini API client directly with process.env.API_KEY following strict guidelines
-const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+// Initialize Gemini API client with Vite env vars
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 if (!apiKey) {
   console.error('⚠️ No Gemini API key found! Set GEMINI_API_KEY in your environment.');
 }
@@ -164,7 +164,7 @@ export const getLiveMatches = async (leagueName?: string): Promise<Match[]> => {
     console.log(`✅ Cache hit: ${cacheKey}`);
     return cached;
   }
-  if (!process.env.API_KEY) return INITIAL_LIVE_MATCHES;
+  if (!apiKey) return INITIAL_LIVE_MATCHES;
 
   const dedupKey = `live_${dateStr}_${leagueName || 'all'}`;
   return dedupedApiCall(dedupKey, async () => {
@@ -268,7 +268,7 @@ export const getExcitingMatches = async (): Promise<Match[]> => {
     console.log(`✅ Cache hit: ${cacheKey}`);
     return cached;
   }
-  if (!process.env.API_KEY) return INITIAL_EXCITING_MATCHES;
+  if (!apiKey) return INITIAL_EXCITING_MATCHES;
 
   const dedupKey = `exciting_week_${weekNumber}`;
   return dedupedApiCall(dedupKey, async () => {
@@ -353,7 +353,7 @@ export const getHighestScoringMatches = async (): Promise<Match[]> => {
   const cacheKey = 'high_scoring_v2';
   const cached = getCachedData<Match[]>(cacheKey);
   if (cached) return cached;
-  if (!process.env.API_KEY) return INITIAL_HIGHEST_SCORING_MATCHES;
+  if (!apiKey) return INITIAL_HIGHEST_SCORING_MATCHES;
 
   return dedupedApiCall('high_scoring', async () => {
     try {
@@ -481,7 +481,7 @@ export const getLeagueMetrics = async (): Promise<LeagueMetric[]> => {
 };
 
 export const searchEntities = async (query: string): Promise<Entity[]> => {
-  if (!process.env.API_KEY || !query) return [];
+  if (!apiKey || !query) return [];
 
   // Check cache first
   const cacheKey = `search_${query.toLowerCase()}`;
@@ -626,7 +626,7 @@ export const getExcitingPlayers = async (): Promise<Entity[]> => {
     console.log(`✅ Cache hit: ${cacheKey}`);
     return cached;
   }
-  if (!process.env.API_KEY) return [];
+  if (!apiKey) return [];
 
   const dedupKey = `exciting_players_${dateStr}`;
   return dedupedApiCall(dedupKey, async () => {

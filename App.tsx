@@ -405,69 +405,80 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // Stage 1: Fetch live matches first (critical path)
     fetchLive(false);
 
-    setTimeout(async () => {
-      try {
-        console.log('🎯 Fetching exciting matches from API...');
-        let exciting = await getExcitingMatchesFromAPI();
-        if (exciting.length === 0) {
-          console.log('🤖 API returned no data, falling back to Gemini...');
-          exciting = await getExcitingMatches();
-        }
-        setExcitingMatches(exciting);
-      } catch (err) {
-        console.error('Failed to load exciting matches:', err);
-        setExcitingMatches(await getExcitingMatches());
-      }
-    }, 100);
+    // Stage 2: Fetch all secondary data in parallel (non-blocking)
+    const fetchSecondaryData = async () => {
+      await Promise.allSettled([
+        // Exciting matches
+        (async () => {
+          try {
+            console.log('🎯 Fetching exciting matches from API...');
+            let exciting = await getExcitingMatchesFromAPI();
+            if (exciting.length === 0) {
+              console.log('🤖 API returned no data, falling back to Gemini...');
+              exciting = await getExcitingMatches();
+            }
+            setExcitingMatches(exciting);
+          } catch (err) {
+            console.error('Failed to load exciting matches:', err);
+            try { setExcitingMatches(await getExcitingMatches()); } catch { /* noop */ }
+          }
+        })(),
+        // Highest scoring matches
+        (async () => {
+          try {
+            console.log('🎯 Fetching highest scoring matches from API...');
+            let highScoring = await getHighestScoringMatchesFromAPI();
+            if (highScoring.length === 0) {
+              console.log('🤖 API returned no data, falling back to Gemini...');
+              highScoring = await getHighestScoringMatches();
+            }
+            setHighestScoringMatches(highScoring);
+          } catch (err) {
+            console.error('Failed to load highest scoring matches:', err);
+            try { setHighestScoringMatches(await getHighestScoringMatches()); } catch { /* noop */ }
+          }
+        })(),
+        // Top players
+        (async () => {
+          try {
+            console.log('🎯 Fetching top players from API...');
+            let players = await getTopPlayersFromAPI();
+            if (players.length === 0) {
+              console.log('🤖 API returned no data, falling back to Gemini...');
+              players = await getExcitingPlayers();
+            }
+            setExcitingPlayers(players);
+          } catch (err) {
+            console.error('Failed to load top players:', err);
+            try { setExcitingPlayers(await getExcitingPlayers()); } catch { /* noop */ }
+          }
+        })(),
+        // Upcoming matches
+        (async () => {
+          try {
+            console.log('📅 Fetching upcoming matches...');
+            const upcoming = await fetchUpcomingFixtures();
+            setUpcomingMatches(upcoming);
+          } catch (err) {
+            console.error('Failed to load upcoming matches:', err);
+          }
+        })(),
+        // Community data
+        (async () => {
+          console.log('👥 Fetching community activity...');
+          await Promise.allSettled([
+            fetchRecentActivity(),
+            fetchPopularLists(),
+            fetchCommunityStats()
+          ]);
+        })()
+      ]);
+    };
 
-    setTimeout(async () => {
-      try {
-        console.log('🎯 Fetching highest scoring matches from API...');
-        let highScoring = await getHighestScoringMatchesFromAPI();
-        if (highScoring.length === 0) {
-          console.log('🤖 API returned no data, falling back to Gemini...');
-          highScoring = await getHighestScoringMatches();
-        }
-        setHighestScoringMatches(highScoring);
-      } catch (err) {
-        console.error('Failed to load highest scoring matches:', err);
-        setHighestScoringMatches(await getHighestScoringMatches());
-      }
-    }, 200);
-
-    setTimeout(async () => {
-      try {
-        console.log('🎯 Fetching top players from API...');
-        let players = await getTopPlayersFromAPI();
-        if (players.length === 0) {
-          console.log('🤖 API returned no data, falling back to Gemini...');
-          players = await getExcitingPlayers();
-        }
-        setExcitingPlayers(players);
-      } catch (err) {
-        console.error('Failed to load top players:', err);
-        setExcitingPlayers(await getExcitingPlayers());
-      }
-    }, 300);
-
-    setTimeout(async () => {
-      try {
-        console.log('📅 Fetching upcoming matches...');
-        const upcoming = await fetchUpcomingFixtures();
-        setUpcomingMatches(upcoming);
-      } catch (err) {
-        console.error('Failed to load upcoming matches:', err);
-      }
-    }, 350);
-
-    setTimeout(() => {
-      console.log('👥 Fetching community activity...');
-      fetchRecentActivity();
-      fetchPopularLists();
-      fetchCommunityStats();
-    }, 450);
+    fetchSecondaryData();
 
     const liveInterval = setInterval(async () => {
       console.log('⚽ Checking for live match updates...');
@@ -475,8 +486,9 @@ const App: React.FC = () => {
         const liveMatches = await fetchLiveFixtures();
         if (liveMatches.length > 0) {
           setFeaturedMatches(prev => {
-            const nonLiveMatches = prev.filter(m => m.status !== 'LIVE');
-            return [...liveMatches, ...nonLiveMatches];
+            const liveIds = new Set(liveMatches.map(m => m.id));
+            const otherMatches = prev.filter(m => !liveIds.has(m.id) && m.status !== 'LIVE');
+            return [...liveMatches, ...otherMatches];
           });
           console.log(`✅ Updated ${liveMatches.length} live matches`);
         }
@@ -730,7 +742,13 @@ const App: React.FC = () => {
     if (dateFilter === 'today') {
       const today = new Date().toISOString().split('T')[0];
       matches = matches.filter(m => {
-        return true;
+        if (!m.minute) return true;
+        // Keep live, HT, FT matches (they're from today)
+        if (m.status === 'LIVE' || m.status === 'HT' || m.status === 'FT') return true;
+        // For upcoming matches, check if the date string contains today
+        const minuteStr = (m.minute || '').toLowerCase();
+        const todayFormatted = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return minuteStr.includes(todayFormatted.toLowerCase()) || m.status === 'UPCOMING';
       });
     }
     return matches;

@@ -40,8 +40,8 @@ export const getPredictedLineups = async (
       const { data, timestamp } = JSON.parse(cached);
       const age = Date.now() - timestamp;
 
-      // Cache valid for 6 hours
-      if (age < 21600000) {
+      // Cache valid for 2 hours
+      if (age < 7200000) {
         console.log('✅ Using cached predicted lineups');
         return data;
       }
