@@ -127,7 +127,7 @@ const PitchFormation: React.FC<{
         <div className="absolute inset-2 border border-white/20 rounded-sm"></div>
       </div>
 
-      <div className="absolute top-0 left-0 right-0 h-1/2 flex flex-col justify-around py-4 px-4">
+      <div className="absolute top-0 left-0 right-0 h-1/2 flex flex-col justify-around py-4 px-4 z-10">
         {homeFormationRows.map((row, rowIdx) => (
           <div key={`home-${rowIdx}`} className="flex justify-around items-center px-2">
             {row.map((player, pIdx) => (
@@ -137,7 +137,7 @@ const PitchFormation: React.FC<{
         ))}
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 h-1/2 flex flex-col-reverse justify-around py-4 px-4">
+      <div className="absolute bottom-0 left-0 right-0 h-1/2 flex flex-col-reverse justify-around py-4 px-4 z-10">
         {awayFormationRows.map((row, rowIdx) => (
           <div key={`away-${rowIdx}`} className="flex justify-around items-center px-2">
             {row.map((player, pIdx) => (
@@ -147,10 +147,10 @@ const PitchFormation: React.FC<{
         ))}
       </div>
 
-      <div className="absolute top-2 left-3 text-[10px] font-bold text-white/60 bg-black/30 px-2 py-0.5 rounded">
+      <div className="absolute top-2 left-3 text-[10px] font-bold text-white/60 bg-black/30 px-2 py-0.5 rounded z-10">
         {homeFormation}
       </div>
-      <div className="absolute bottom-2 right-3 text-[10px] font-bold text-white/60 bg-black/30 px-2 py-0.5 rounded">
+      <div className="absolute bottom-2 right-3 text-[10px] font-bold text-white/60 bg-black/30 px-2 py-0.5 rounded z-10">
         {awayFormation}
       </div>
     </div>
