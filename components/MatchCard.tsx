@@ -1,87 +1,173 @@
 import React from 'react';
-import { Entity, Match } from '../types';
+import { Link } from 'react-router-dom';
+import { Eye, Clock, Star } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import type { Match, MatchSnapshot } from '../types';
+import { getCompetitionByCode } from '../constants';
 import StarRating from './StarRating';
-import { Eye, Activity, Goal, CreditCard, Flame } from 'lucide-react';
-import { getScoreBadgeColor, isMustWatch as checkMustWatch } from '../utils/scoreUtils';
 
-interface MatchCardProps {
-  match: Entity;
-  onClick: (id: string) => void;
-  onLog?: (e: React.MouseEvent) => void;
-  hoverEffect?: boolean;
+interface Props {
+  match: Match | MatchSnapshot;
+  userRating?: number;
+  isLogged?: boolean;
+  onLog?: () => void;
+  compact?: boolean;
 }
 
-const MatchCard: React.FC<MatchCardProps> = ({ match, onClick, hoverEffect = true }) => {
-  const isMatch = match.type === 'MATCH';
-  const m = isMatch ? (match as Match) : null;
-  const isLive = m?.status === 'LIVE';
-  const watchScore = m?.watchability || 0;
-  const mustWatch = checkMustWatch(watchScore);
+function getStatusLabel(status: string) {
+  switch (status) {
+    case 'IN_PLAY': return { label: 'LIVE', cls: 'status-live' };
+    case 'PAUSED': return { label: 'HT', cls: 'status-live' };
+    case 'FINISHED': return { label: 'FT', cls: 'status-finished' };
+    case 'SCHEDULED':
+    case 'TIMED': return { label: 'Upcoming', cls: 'status-scheduled' };
+    case 'POSTPONED': return { label: 'PPD', cls: 'status-scheduled' };
+    default: return { label: status, cls: 'status-scheduled' };
+  }
+}
+
+function ScoreDisplay({ score, status }: { score: Match['score']; status: string }) {
+  const isFinished = ['FINISHED', 'IN_PLAY', 'PAUSED', 'AWARDED'].includes(status);
+  if (!isFinished || score.fullTime.home === null) {
+    return <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>–</span>;
+  }
+  return (
+    <span style={{
+      fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)',
+      fontVariantNumeric: 'tabular-nums',
+    }}>
+      {score.fullTime.home}–{score.fullTime.away}
+    </span>
+  );
+}
+
+function TeamCrest({ crest, name, size = 28 }: { crest?: string; name: string; size?: number }) {
+  const [error, setError] = React.useState(false);
+  if (error || !crest) {
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: 4,
+        background: 'var(--bg-elevated)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: size * 0.35, fontWeight: 700, color: 'var(--text-muted)',
+        flexShrink: 0,
+      }}>
+        {name.slice(0, 2).toUpperCase()}
+      </div>
+    );
+  }
+  return (
+    <img
+      src={crest}
+      alt={name}
+      width={size}
+      height={size}
+      onError={() => setError(true)}
+      style={{ objectFit: 'contain', flexShrink: 0 }}
+    />
+  );
+}
+
+export { TeamCrest };
+
+export default function MatchCard({ match, userRating, isLogged, onLog, compact = false }: Props) {
+  const competition = getCompetitionByCode(match.competition.code);
+  const { label: statusLabel, cls: statusCls } = getStatusLabel(match.status);
+  const dateStr = format(parseISO(match.utcDate), compact ? 'MMM d' : 'EEE MMM d, yyyy');
+  const timeStr = format(parseISO(match.utcDate), 'HH:mm');
 
   return (
-    <div
-      onClick={() => onClick(match.id)}
-      className={`group relative flex flex-col gap-2 cursor-pointer ${hoverEffect ? 'hover:-translate-y-1 transition duration-300' : ''}`}
+    <div style={{
+      background: 'var(--bg-card)',
+      border: '1px solid var(--border)',
+      borderRadius: 8,
+      padding: compact ? 12 : 16,
+      transition: 'border-color 0.15s, box-shadow 0.15s',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 10,
+    }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-light)';
+        (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.3)';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
+        (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+      }}
     >
-      <div className={`relative aspect-[16/10] rounded-xl overflow-hidden border transition ${
-        mustWatch ? 'border-orange-500/40' : 'border-white/[0.06] group-hover:border-white/[0.12]'
-      }`}>
-        <div style={{ background: match.image }} className="absolute inset-0 opacity-30 group-hover:opacity-40 transition duration-500" />
-        <div className="absolute inset-0 bg-gradient-to-t from-dark-950 via-dark-950/50 to-transparent" />
-
-        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 items-start">
-          {isMatch && m?.minute && (
-            <span className={`px-2 py-0.5 rounded-md text-xs font-bold flex items-center gap-1 ${isLive ? 'bg-red-600 text-white' : 'bg-zinc-800/80 text-zinc-300'}`}>
-              {isLive && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
-              {m.minute}
-            </span>
+      {/* Competition + date row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {competition?.emblem && (
+            <img src={competition.emblem} alt="" width={14} height={14} style={{ objectFit: 'contain' }}
+              onError={e => { (e.target as HTMLElement).style.display = 'none'; }} />
           )}
-          {isMatch && watchScore > 0 && (
-            <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase text-white flex items-center gap-1 ${getScoreBadgeColor(watchScore)}`}>
-              {mustWatch ? <Flame size={10} className="text-yellow-200 fill-yellow-200" /> : <Eye size={10} />}
-              {watchScore.toFixed(1)}
-            </div>
-          )}
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+            {competition?.flag} {competition?.shortName ?? match.competition.name}
+            {match.matchday ? ` · MD${match.matchday}` : ''}
+          </span>
         </div>
-
-        {isMatch && m?.score && (
-          <div className="absolute bottom-2.5 right-2.5 bg-black/60 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10">
-            <span className="text-white font-mono font-bold text-lg tracking-widest">{m.score}</span>
-          </div>
-        )}
-
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300 bg-black/40">
-          <Activity size={28} className="text-white drop-shadow-lg" />
-        </div>
+        <span className={`competition-badge ${statusCls}`} style={{ fontSize: 10 }}>{statusLabel}</span>
       </div>
 
-      <div className="flex flex-col">
-        <h3 className="text-sm font-semibold text-zinc-200 leading-tight group-hover:text-pitch-400 transition line-clamp-2">{match.name}</h3>
-        {isMatch && m?.events && m.events.length > 0 && (
-          <div className="mt-1 flex items-center gap-1.5 text-xs text-zinc-400">
-            {m.events.slice(-1).map((event, idx) => (
-              <React.Fragment key={idx}>
-                {event.type === 'GOAL' ? <Goal size={11} className="text-emerald-400" /> : <CreditCard size={11} className="text-amber-400" />}
-                <span className="font-mono text-[10px]">{event.minute}'</span>
-                <span className="truncate">{event.player}</span>
-              </React.Fragment>
-            ))}
-          </div>
-        )}
-        <div className="flex justify-between items-center mt-1">
-          <span className="text-xs text-zinc-500 truncate max-w-[70%]">{match.subtitle}</span>
-          {match.rating ? (
-            <div className="flex items-center gap-1">
-              <StarRating rating={match.rating} size={10} maxRating={1} />
-              <span className="text-xs text-zinc-400">{match.rating.toFixed(1)}</span>
+      {/* Teams + Score */}
+      <Link to={`/match/${match.id}`} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+          <TeamCrest crest={match.homeTeam.crest} name={match.homeTeam.shortName ?? match.homeTeam.name} size={28} />
+          <span style={{
+            fontSize: 13, fontWeight: 600, color: 'var(--text-primary)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {match.homeTeam.shortName ?? match.homeTeam.name}
+          </span>
+        </div>
+
+        <div style={{ textAlign: 'center', flexShrink: 0, minWidth: 52 }}>
+          {['SCHEDULED', 'TIMED'].includes(match.status) ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{dateStr}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{timeStr}</span>
             </div>
           ) : (
-            <span className="text-[10px] text-zinc-600 uppercase font-semibold">Unrated</span>
+            <ScoreDisplay score={match.score} status={match.status} />
           )}
         </div>
-      </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, justifyContent: 'flex-end' }}>
+          <span style={{
+            fontSize: 13, fontWeight: 600, color: 'var(--text-primary)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right',
+          }}>
+            {match.awayTeam.shortName ?? match.awayTeam.name}
+          </span>
+          <TeamCrest crest={match.awayTeam.crest} name={match.awayTeam.shortName ?? match.awayTeam.name} size={28} />
+        </div>
+      </Link>
+
+      {/* Footer */}
+      {!compact && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Clock size={11} color="var(--text-muted)" />
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{dateStr}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {userRating ? (
+              <StarRating value={userRating} readonly size={12} />
+            ) : null}
+            {onLog && (
+              <button
+                onClick={e => { e.preventDefault(); onLog(); }}
+                className={`btn-log ${isLogged ? 'logged' : ''}`}
+              >
+                <Eye size={11} />
+                {isLogged ? 'Logged' : 'Log'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
-};
-
-export default React.memo(MatchCard);
+}

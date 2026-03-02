@@ -1,53 +1,88 @@
 import React, { useState } from 'react';
 import { Star } from 'lucide-react';
 
-interface StarRatingProps {
-  rating: number;
-  maxRating?: number;
-  interactive?: boolean;
-  onRate?: (rating: number) => void;
+interface Props {
+  value: number;
+  onChange?: (v: number) => void;
+  readonly?: boolean;
   size?: number;
-  showValue?: boolean;
+  showNumber?: boolean;
 }
 
-const StarRating: React.FC<StarRatingProps> = ({ rating, maxRating = 5, interactive = false, onRate, size = 16, showValue = false }) => {
-  const [hoverRating, setHoverRating] = useState<number | null>(null);
-  const displayRating = hoverRating !== null ? hoverRating : rating;
+export default function StarRating({ value, onChange, readonly = false, size = 16, showNumber = false }: Props) {
+  const [hover, setHover] = useState(0);
+  const display = hover || value;
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>, index: number) => {
-    if (!interactive) return;
-    const { left, width } = e.currentTarget.getBoundingClientRect();
-    const percent = (e.clientX - left) / width;
-    setHoverRating(index + (percent < 0.5 ? 0.5 : 1));
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+      {[1, 2, 3, 4, 5].map(n => {
+        const filled = display >= n;
+        const half = !filled && display >= n - 0.5;
+        return (
+          <Star
+            key={n}
+            size={size}
+            fill={filled || half ? 'var(--star)' : 'none'}
+            color={filled || half ? 'var(--star)' : 'var(--border-light)'}
+            style={{ cursor: readonly ? 'default' : 'pointer', flexShrink: 0 }}
+            onMouseEnter={() => !readonly && setHover(n)}
+            onMouseLeave={() => !readonly && setHover(0)}
+            onClick={() => !readonly && onChange?.(n)}
+          />
+        );
+      })}
+      {showNumber && value > 0 && (
+        <span style={{ fontSize: 13, color: 'var(--star)', marginLeft: 4, fontWeight: 600 }}>
+          {value.toFixed(1)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+export function HalfStarRating({ value, onChange, size = 16 }: { value: number; onChange?: (v: number) => void; size?: number }) {
+  const [hover, setHover] = useState(0);
+  const display = hover || value;
+
+  const handleMouseMove = (e: React.MouseEvent<SVGElement>, n: number) => {
+    if (!onChange) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const half = e.clientX < rect.left + rect.width / 2;
+    setHover(half ? n - 0.5 : n);
   };
 
   return (
-    <div className="flex items-center gap-1.5">
-      <div className="flex items-center" onMouseLeave={() => interactive && setHoverRating(null)}>
-        {Array.from({ length: maxRating }).map((_, i) => {
-          const filled = displayRating >= i + 1;
-          const half = displayRating >= i + 0.5 && displayRating < i + 1;
-          return (
-            <div
-              key={i}
-              className={`relative ${interactive ? 'cursor-pointer' : 'cursor-default'}`}
-              onMouseMove={(e) => handleMouseMove(e, i)}
-              onClick={() => { if (interactive && onRate && hoverRating !== null) onRate(hoverRating); }}
-              style={{ width: size, height: size }}
-            >
-              <Star size={size} className={`absolute top-0 left-0 ${filled ? 'text-amber-400 fill-amber-400' : 'text-zinc-700'}`} />
-              {half && (
-                <div className="absolute top-0 left-0 overflow-hidden" style={{ width: '50%' }}>
-                  <Star size={size} className="text-amber-400 fill-amber-400" />
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {showValue && <span className="text-zinc-400 text-sm font-medium">{rating.toFixed(1)}</span>}
-    </div>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+      {[1, 2, 3, 4, 5].map(n => {
+        const filled = display >= n;
+        const half = !filled && display >= n - 0.5;
+        return (
+          <span key={n} style={{ position: 'relative', display: 'inline-flex' }}>
+            {half ? (
+              <span style={{ position: 'relative', display: 'inline-flex' }}>
+                <Star size={size} fill="none" color="var(--border-light)" />
+                <span style={{
+                  position: 'absolute', left: 0, top: 0, width: '50%', overflow: 'hidden', display: 'inline-flex'
+                }}>
+                  <Star size={size} fill="var(--star)" color="var(--star)" />
+                </span>
+              </span>
+            ) : (
+              <Star
+                size={size}
+                fill={filled ? 'var(--star)' : 'none'}
+                color={filled ? 'var(--star)' : 'var(--border-light)'}
+              />
+            )}
+            <span
+              style={{ position: 'absolute', inset: 0, cursor: onChange ? 'pointer' : 'default' }}
+              onMouseMove={e => handleMouseMove(e as unknown as React.MouseEvent<SVGElement>, n)}
+              onMouseLeave={() => setHover(0)}
+              onClick={() => onChange?.(hover)}
+            />
+          </span>
+        );
+      })}
+    </span>
   );
-};
-
-export default React.memo(StarRating);
+}

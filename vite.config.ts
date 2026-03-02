@@ -14,8 +14,7 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react(), tailwindcss()],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || 'AIzaSyB4SL14ZVTbQKv9vnMX7fRKeJnHRtSLjg8'),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || 'AIzaSyB4SL14ZVTbQKv9vnMX7fRKeJnHRtSLjg8')
+        'process.env.VITE_FOOTBALL_DATA_API_KEY': JSON.stringify(env.VITE_FOOTBALL_DATA_API_KEY || ''),
       },
       resolve: {
         alias: {
@@ -23,25 +22,19 @@ export default defineConfig(({ mode }) => {
         }
       },
       build: {
-        // Optimize chunk splitting
         rollupOptions: {
           output: {
             manualChunks: {
-              // Vendor chunks
-              'react-vendor': ['react', 'react-dom'],
+              'react-vendor': ['react', 'react-dom', 'react-router-dom'],
               'firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
               'lucide': ['lucide-react'],
             },
           },
         },
-        // Increase chunk size warning limit
         chunkSizeWarningLimit: 1000,
-        // Enable minification with esbuild (faster than terser)
         minify: isProd ? 'esbuild' : false,
-        // Enable source maps for production debugging (optional)
         sourcemap: !isProd,
       },
-      // Enable gzip compression hints
       esbuild: {
         drop: isProd ? ['console', 'debugger'] : [],
       },

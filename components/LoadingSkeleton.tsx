@@ -1,63 +1,71 @@
 import React from 'react';
 
-interface LoadingSkeletonProps {
-  type?: 'match' | 'player' | 'list';
-  count?: number;
+export function MatchCardSkeleton() {
+  return (
+    <div style={{
+      background: 'var(--bg-card)',
+      borderRadius: 8,
+      padding: 16,
+      border: '1px solid var(--border)',
+    }}>
+      <div className="skeleton" style={{ height: 10, width: '60%', marginBottom: 12 }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <div className="skeleton" style={{ width: 32, height: 32, borderRadius: '50%' }} />
+        <div className="skeleton" style={{ height: 14, flex: 1 }} />
+        <div className="skeleton" style={{ height: 20, width: 40 }} />
+        <div className="skeleton" style={{ height: 14, flex: 1 }} />
+        <div className="skeleton" style={{ width: 32, height: 32, borderRadius: '50%' }} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <div className="skeleton" style={{ height: 22, width: 80, borderRadius: 4 }} />
+        <div className="skeleton" style={{ height: 22, width: 60, borderRadius: 4 }} />
+      </div>
+    </div>
+  );
 }
 
-const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({ type = 'match', count = 4 }) => {
-  const skeletons = Array.from({ length: count }, (_, i) => i);
-
-  if (type === 'match') {
-    return (
-      <>
-        {skeletons.map((i) => (
-          <div key={i} className="animate-pulse">
-            <div className="relative aspect-[16/10] rounded-xl bg-dark-800 overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-dark-800 via-dark-700 to-dark-800 bg-[length:200%_100%] animate-shimmer" />
-              <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-                <div className="h-5 w-14 bg-dark-700 rounded-md" />
-                <div className="h-5 w-24 bg-dark-700 rounded-md" />
-              </div>
-            </div>
-            <div className="mt-2.5 space-y-1.5">
-              <div className="h-4 bg-dark-800 rounded w-3/4" />
-              <div className="h-3 bg-dark-800 rounded w-1/2" />
-            </div>
-          </div>
-        ))}
-      </>
-    );
-  }
-
-  if (type === 'player') {
-    return (
-      <>
-        {skeletons.map((i) => (
-          <div key={i} className="animate-pulse flex items-center gap-3 p-3 bg-dark-800/50 rounded-xl">
-            <div className="h-12 w-12 bg-dark-700 rounded-full" />
-            <div className="flex-1 space-y-2">
-              <div className="h-4 bg-dark-700 rounded w-3/4" />
-              <div className="h-3 bg-dark-800 rounded w-1/2" />
-            </div>
-          </div>
-        ))}
-      </>
-    );
-  }
-
+export function RowSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <>
-      {skeletons.map((i) => (
-        <div key={i} className="animate-pulse p-4 bg-dark-800/30 rounded-xl">
-          <div className="space-y-3">
-            <div className="h-4 bg-dark-700 rounded w-1/4" />
-            <div className="h-3 bg-dark-800 rounded w-3/4" />
-          </div>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          padding: '12px 0',
+          borderBottom: '1px solid var(--border)',
+        }}>
+          <div className="skeleton" style={{ width: 28, height: 28, borderRadius: 4 }} />
+          <div className="skeleton" style={{ height: 14, flex: 1 }} />
+          <div className="skeleton" style={{ height: 14, width: 60 }} />
         </div>
       ))}
     </>
   );
-};
+}
 
-export default LoadingSkeleton;
+export function ProfileSkeleton() {
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 24, alignItems: 'center', marginBottom: 24 }}>
+        <div className="skeleton" style={{ width: 80, height: 80, borderRadius: '50%' }} />
+        <div style={{ flex: 1 }}>
+          <div className="skeleton" style={{ height: 20, width: '40%', marginBottom: 8 }} />
+          <div className="skeleton" style={{ height: 14, width: '60%' }} />
+        </div>
+      </div>
+      <RowSkeleton rows={6} />
+    </div>
+  );
+}
+
+export default function PageLoadingSkeleton() {
+  return (
+    <div style={{ padding: '40px 0' }}>
+      <div className="skeleton" style={{ height: 28, width: '30%', marginBottom: 32 }} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+        {Array.from({ length: 6 }).map((_, i) => <MatchCardSkeleton key={i} />)}
+      </div>
+    </div>
+  );
+}
